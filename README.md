@@ -15,7 +15,7 @@ Steps to install MkDocs with Material theme and all other needed plugins.
 - Install mkdocs and material theme
 
     ```shell
-    pip install mkdocs mkdocs-material
+    pip install mkdocs mkdocs-material[imaging]
     ```
 
 - Install plugins
