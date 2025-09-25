@@ -34,6 +34,7 @@ theme:
   features:
     - content.code.copy
     # - content.code.select # sponsors only feature
+    - content.tabs.link
     - navigation.expand
     - navigation.footer
     - navigation.indexes
@@ -54,15 +55,12 @@ theme:
 plugins:
   - callouts # https://github.com/sondregronas/mkdocs-callouts
   - include-markdown # https://github.com/mondeja/mkdocs-include-markdown-plugin
+  - macros # https://github.com/fralau/mkdocs-macros-plugin - for regex replacements and content tabs
   - search
   - social
-  # - replace_markdown: # https://github.com/wilhelmer/mkdocs-replace-markdown
-  #     patterns:        
-  #         - pattern_1: # Pattern name, can be anything
-  #             url: "System%20Tools/powershell/" # Only replace text on pages that match the given URL
-  #             oldvalue: "https://gist.github.com/tahmidul612/b0aa70aaf128309a0c156cd2dcf6d4bb"
-  #             newvalue: "../Extras/Developer Tools/git.md"
 markdown_extensions:
+  - attr_list
+  - md_in_html
   - admonition
   - nl2br
   - pymdownx.details
