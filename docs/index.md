@@ -1,4 +1,4 @@
-# Arch Linux (CachyOS) Configuration
+# Introduction
 
 ## Background
 
@@ -21,4 +21,3 @@ To install CachyOS, follow the instructions from <https://cachyos.org/> but for 
 - Download and copy CachyOS Desktop Edition ISO to the Ventoy drive | [Download CachyOS](https://cachyos.org/download/)
 - Boot into CachyOS from the USB drive and follow the instructions to setup CachyOS
   > Before starting the CachyOS installation, I recommend reading through the [CachyOS Getting Started Guide](https://wiki.cachyos.org/cachyos_basic/download/). It explains a lot of specifics, and generally a good reference for setting up a new Linux system.
-  
