@@ -1,0 +1,84 @@
+site_name: Arch Linux (CachyOS) Setup Guide
+site_author: Tahmidul Islam
+site_url: "https://archconfig.tahmidul612.com"
+repo_url: "https://github.com/tahmidul612/arch-config"
+repo_name: "arch-config"
+theme: 
+  name: material
+  logo: assets/arch-linux.svg
+  favicon: assets/cog-custom.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to system preference
+  features:
+    - content.code.copy
+    # - content.code.select # sponsors only feature
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    # - navigation.instant.prefetch # sponsors only feature
+    - navigation.instant.progress
+    # - navigation.path # sponsors only feature
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+  font:
+    text: Open Sans
+    code: JetBrains Mono
+plugins:
+  - callouts # https://github.com/sondregronas/mkdocs-callouts
+  - include-markdown # https://github.com/mondeja/mkdocs-include-markdown-plugin
+  - search
+  - social
+  # - replace_markdown: # https://github.com/wilhelmer/mkdocs-replace-markdown
+  #     patterns:        
+  #         - pattern_1: # Pattern name, can be anything
+  #             url: "System%20Tools/powershell/" # Only replace text on pages that match the given URL
+  #             oldvalue: "https://gist.github.com/tahmidul612/b0aa70aaf128309a0c156cd2dcf6d4bb"
+  #             newvalue: "../Extras/Developer Tools/git.md"
+markdown_extensions:
+  - admonition
+  - nl2br
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown-extensions/#keys
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: ⚓︎
+extra_css:
+  - stylesheets/extra.css
+# not_in_nav: |
+#   System Tools/mods/
