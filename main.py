@@ -303,7 +303,8 @@ def _process_tab_group(text: str, tab_blocks: list) -> str:
     # If so, we need to break out of the list context for tabs to work
     in_list_item = base_indent == '  '
 
-    tab_contents = []
+    # Process all tabs first, storing them with their names for sorting
+    processed_tabs = []
 
     if DEBUG_CONTENT_TABS:
         print(f"DEBUG: Processing {len(tab_blocks)} tabs with base_indent='{repr(base_indent)}', in_list_item={in_list_item}")
@@ -330,7 +331,25 @@ def _process_tab_group(text: str, tab_blocks: list) -> str:
             effective_indent
         )
 
-        tab_contents.append(processed_tab)
+        processed_tabs.append({
+            'name': start_marker['name'],
+            'content': processed_tab
+        })
+
+    # Sort tabs to put Arch first, then others alphabetically
+    def tab_sort_key(tab_info):
+        name = tab_info['name'].lower()
+        if name == 'arch':
+            return (0, name)  # Priority 0 for Arch
+        else:
+            return (1, name)  # Priority 1 for others, then alphabetical
+
+    sorted_tabs = sorted(processed_tabs, key=tab_sort_key)
+    tab_contents = [tab['content'] for tab in sorted_tabs]
+
+    if DEBUG_CONTENT_TABS:
+        tab_names = [tab['name'] for tab in sorted_tabs]
+        print(f"DEBUG: Reordered tabs: {tab_names}")
 
     if len(tab_blocks) == 1:
         # Single tab - return as-is
