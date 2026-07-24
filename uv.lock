@@ -21,7 +21,7 @@ requires-dist = [
     { name = "mkdocs-callouts", specifier = ">=1.16.0" },
     { name = "mkdocs-include-markdown-plugin", specifier = ">=7.1.7" },
     { name = "mkdocs-macros-plugin", specifier = ">=1.4.0" },
-    { name = "mkdocs-material", extras = ["imaging"], specifier = ">=9.6.20" },
+    { name = "mkdocs-material", extras = ["imaging"], specifier = ">=9.7.7" },
     { name = "mkdocs-replace-markdown", specifier = ">=0.1.0" },
 ]
 
