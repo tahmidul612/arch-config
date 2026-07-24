@@ -8,19 +8,20 @@ This repository contains the MkDocs source for an Arch Linux (CachyOS) setup gui
 
 ## Development Commands
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Do not use `pip` or `requirements.txt`.
+
 ### Setup Virtual Environment
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install mkdocs mkdocs-material[imaging]
-pip install mkdocs-callouts mkdocs-include-markdown-plugin mkdocs-replace-markdown
+uv sync
 ```
+
+Creates `.venv/` and installs the locked dependencies from `uv.lock`. Add or change dependencies with `uv add` / `uv remove` so `pyproject.toml` and `uv.lock` stay in sync.
 
 ### Run Development Server
 
 ```bash
-mkdocs serve
+uv run mkdocs serve
 ```
 
 The site will be available at <http://localhost:8000> with auto-reload on file changes.
@@ -28,13 +29,14 @@ The site will be available at <http://localhost:8000> with auto-reload on file c
 ### Build Static Site
 
 ```bash
-mkdocs build
+uv run mkdocs build
 ```
 
 Generates the static site in the `site/` directory.
 
 ## Project Structure
 
+- `pyproject.toml` / `uv.lock` - Python dependencies, managed by uv
 - `mkdocs.yml` - Main configuration file for MkDocs site settings, theme configuration, and plugins
 - `docs/` - Contains all documentation markdown files
   - `index.md` - Home page
