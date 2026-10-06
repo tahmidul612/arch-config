@@ -50,12 +50,14 @@ start)
   sleep 1
   # Prime sudo first so the auth prompt (password, or Howdy face-unlock) happens
   # at a predictable moment instead of surfacing 20 minutes into an AUR build.
-  tmux send-keys -t "$SESSION" 'sudo -v' Enter
-  sleep 6
+  # sudo and paru go in ONE command line so paru starts only once sudo succeeds:
+  # sending paru separately after a fixed sleep typed it into a still-waiting
+  # password prompt. `until` re-prompts on a failed attempt (watch escalates each
+  # prompt as SUDO_PASSWORD) rather than running paru without auth.
   # The sentinel is built with printf's %s so the *echoed command line* never
   # contains a literal "UPGRADE_DONE_<digit>". Matching on the digit is what
   # distinguishes real completion from the command echo.
-  tmux send-keys -t "$SESSION" "paru -Syu $* ; printf 'UPGRADE_DONE_%s\\n' \"\$?\"" Enter
+  tmux send-keys -t "$SESSION" "until sudo -v; do :; done; paru -Syu $* ; printf 'UPGRADE_DONE_%s\\n' \"\$?\"" Enter
   echo "STARTED session=$SESSION workdir=$WORKDIR"
   ;;
 
