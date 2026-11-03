@@ -25,3 +25,9 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it first
     ```
 
 To add a dependency, use `uv add <package>` so `pyproject.toml` and `uv.lock` stay in sync.
+
+## Dotfiles
+
+`dotfiles/` holds config shared between machines that the site documents, installed with a script per tool:
+
+- `dotfiles/install-tmux.sh` installs the tmux setup ([docs](docs/Utilities/tmux.md)). The canonical copy lives in my private laptop dotfiles repo; copy changes here so other hosts get them. Per-machine settings go in an untracked `~/.config/tmux/local.conf`.

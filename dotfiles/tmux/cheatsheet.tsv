@@ -1,0 +1,88 @@
+# section	keys	action   (tab-separated; shown by cheatsheet.sh, Ctrl-b ?)
+Basics	Ctrl-b, then key	Every binding below: press Ctrl-b, let go, then the key
+Basics	Ctrl-b ?	This cheatsheet (type to search, Esc to close)
+Basics	Ctrl-b /	Describe what a single key does
+Basics	Ctrl-b :	tmux command prompt
+Basics	Ctrl-b r	Reload tmux.conf
+Basics	Ctrl-b ~	Show tmux messages (errors from plugins, reloads)
+Sessions	tmux new -A -s NAME	Attach to session NAME, creating it if missing
+Sessions	tmux ls	List sessions
+Sessions	Ctrl-b d	Detach (session keeps running)
+Sessions	Ctrl-b s	Session/window tree (x kills the highlighted item)
+Sessions	Ctrl-b S	Session + project picker (sesh/fzf)
+Sessions	Ctrl-b $	Rename session
+Sessions	Ctrl-b ( / )	Previous / next session
+Sessions	Ctrl-b BTab	Switch session (3.8 chooser)
+Windows	Ctrl-b c	New window (current directory)
+Windows	Ctrl-b ,	Rename window
+Windows	Ctrl-b n / p	Next / previous window
+Windows	Ctrl-b 1..9	Go to window by number
+Windows	Ctrl-b l	Last (previously used) window
+Windows	Ctrl-b w	Window tree picker
+Windows	Ctrl-b Tab	Switch window (3.8 chooser)
+Windows	Ctrl-b f	Find a window by text
+Windows	Ctrl-b &	Kill window
+Windows	Ctrl-b .	Move window to a new index
+Windows	Ctrl-b M-n / M-p	Next / previous window with an alert (bell, activity)
+Panes	Ctrl-b |	Split left/right (current directory)
+Panes	Ctrl-b -	Split top/bottom (current directory)
+Panes	Ctrl-b % / "	Split left/right / top/bottom (tmux defaults)
+Panes	Ctrl-b arrows	Move to the pane in that direction
+Panes	Ctrl-b o / ;	Next pane / previously active pane
+Panes	Ctrl-b q	Show pane numbers (press a number to jump)
+Panes	Ctrl-b z	Zoom pane to full window (toggle)
+Panes	Ctrl-b x	Kill pane
+Panes	Ctrl-b !	Break pane out into its own window
+Panes	Ctrl-b { / }	Swap pane with previous / next
+Panes	Ctrl-b Space	Cycle layouts
+Panes	Ctrl-b M-1..7	Pick a layout (even, main-horizontal, tiled...)
+Panes	Ctrl-b C-arrows	Resize pane by 1
+Panes	Ctrl-b M-arrows	Resize pane by 5
+Panes	Ctrl-b E	Spread panes out evenly
+Panes	Ctrl-b >	Pane menu (also right-click a pane)
+Panes	mouse	Click to focus, drag a border to resize, wheel to scroll
+Floating	Ctrl-b *	New floating pane (tmux 3.8)
+Floating	Ctrl-b @	Toggle pane between floating and tiled
+Floating	Ctrl-b g	Move mode for the floating pane (arrows, Esc)
+Floating	Ctrl-b P	Toggle the scratch terminal popup (keeps its state)
+Copy mode	Ctrl-b [	Enter copy mode (scroll with mouse wheel also enters it)
+Copy mode	Ctrl-b PgUp	Enter copy mode and scroll up a page
+Copy mode	q / Esc	Leave copy mode
+Copy mode	v / C-v / y	Start selection / rectangle / copy to clipboard (vi keys)
+Copy mode	/ ?  then n N	Search down / up, next / previous match
+Copy mode	g / G	Top / bottom of history
+Copy mode	Ctrl-b ]	Paste the last copied buffer
+Copy mode	Ctrl-b =	Choose a paste buffer
+Nesting (SSH)	F12	Laptop tmux off: all keys go to the remote tmux inside (status shows OFF)
+Nesting (SSH)	F12 again	Laptop tmux back on
+Nesting (SSH)	Ctrl-b Ctrl-b	Send one Ctrl-b to the inner tmux without toggling
+Nesting (SSH)	ssh HOST	Interactive SSH auto-attaches to session "main" (skip: NOTMUX=1)
+Nesting (SSH)	mosh HOST	Same auto-attach; Shift+Enter in Claude needs Ctrl-J instead over mosh
+Agent sidebar	Ctrl-b a	Toggle the Claude/agent sidebar in this window
+Agent sidebar	Ctrl-b A	Toggle the sidebar in all windows
+Agent sidebar	j / k	(in sidebar) Move selection
+Agent sidebar	Enter	(in sidebar) Jump to the selected agent pane
+Agent sidebar	h / l / Tab	(in sidebar) Filter by status: all / running / waiting / idle / error
+Agent sidebar	r	(in sidebar) Filter by repo
+Agent sidebar	Shift+Tab	(in sidebar) Bottom panel: Activity / Git
+Agent sidebar	n	(in sidebar) Spawn a new git worktree + Claude in a new window
+Agent sidebar	x	(in sidebar) Close a spawned pane (y also removes worktree + branch)
+Agent sidebar	Esc	(in sidebar) Return focus to your pane
+Agent sidebar	● ⏳ ✗	Status bar: Claude waiting on you / working / errored
+Fingers	Ctrl-b F	Hint mode: letters on paths, URLs, hashes, IPs, numbers
+Fingers	Ctrl-b J	Jump mode: hint letters move the copy-mode cursor there
+Fingers	a-z	(in hint mode) Copy that match to the clipboard
+Fingers	Shift+a-z	(in hint mode) Copy and paste it into the pane
+Fingers	Ctrl+a-z	(in hint mode) Copy and open it (URL in browser, file in app)
+Fingers	Tab	(in hint mode) Multi-select; Tab again copies all selected
+Fingers	q / Esc	(in hint mode) Leave
+Sesh	Ctrl-b S	Picker: tmux sessions + zoxide project dirs
+Sesh	Ctrl-a / Ctrl-t / Ctrl-x	(in picker) Show all / only tmux sessions / only zoxide dirs
+Sesh	Ctrl-d	(in picker) Kill the highlighted session
+Sesh	Enter	(in picker) Switch to it (creates a session for a directory)
+Resurrect	Ctrl-b Ctrl-s	Save all sessions now
+Resurrect	Ctrl-b Ctrl-r	Restore the last save
+Resurrect	automatic	Continuum saves every 15 min and restores when tmux starts
+Plugins	Ctrl-b I	Install plugins listed in tmux.conf (runs install wizards)
+Plugins	Ctrl-b U	Update plugins
+Plugins	Ctrl-b M-u	Remove plugins no longer listed
