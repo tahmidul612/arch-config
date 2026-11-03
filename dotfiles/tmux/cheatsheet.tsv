@@ -16,6 +16,7 @@ Sessions	Ctrl-b BTab	Switch session (3.8 chooser)
 Windows	Ctrl-b c	New window (current directory)
 Windows	Ctrl-b ,	Rename window
 Windows	Ctrl-b n / p	Next / previous window
+Windows	Alt-Shift-Left / Right	Previous / next window (no prefix; nested: F12 first)
 Windows	Ctrl-b 1..9	Go to window by number
 Windows	Ctrl-b l	Last (previously used) window
 Windows	Ctrl-b w	Window tree picker
