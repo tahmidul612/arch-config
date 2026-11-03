@@ -21,3 +21,4 @@
 - [ ] eza | <https://eza.rocks/>
 - [ ] tldr | <https://tealdeer-rs.github.io/tealdeer/>
 - [ ] zoxide | <https://github.com/ajeetdsouza/zoxide>
+- [x] Mosh | <https://mosh.org>
