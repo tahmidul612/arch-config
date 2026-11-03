@@ -52,7 +52,14 @@ mosh --ssh="ssh -i ~/.ssh/id_ed25519" user@hostname
 mosh --ssh="ssh -p 2222" user@hostname
 ```
 
-Mosh will automatically use your `~/.ssh/config` aliases, so existing SSH host aliases like `mosh ollivanders` work out of the box.
+Mosh will automatically use your `~/.ssh/config` aliases, so existing SSH host aliases like `mosh myserver` work out of the box.
+
+!!! tip "Pair it with tmux"
+    Mosh has no scrollback. Attach to a [tmux](tmux.md) session on the remote host so you get scrollback, and the session survives if Mosh drops:
+
+    ```bash
+    mosh myserver -- tmux new -A -s main
+    ```
 
 ## Troubleshooting
 
