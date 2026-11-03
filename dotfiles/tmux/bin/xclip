@@ -1,0 +1,30 @@
+#!/bin/sh
+# xclip shim: inside tmux, take DISPLAY/XAUTHORITY from the tmux session
+# before running the real xclip.
+#
+# Why: Claude Code pastes images by running `xclip -selection clipboard -t image/png -o`.
+# Over `ssh -X`, DISPLAY is a per-connection forward (localhost:10.0, 11.0, ...).
+# A long-running claude in a tmux pane keeps the DISPLAY of the connection it
+# started under, so after a reconnect its paste goes to a dead display. tmux
+# refreshes the *session* environment on every attach (update-environment), so
+# reading it here always gives the most recent client's display. If that client
+# connected without X forwarding, tmux reports DISPLAY as removed and xclip fails.
+#
+# Limitation: the environment is per session, not per client. If one session is
+# attached both locally and over ssh, the most recent attach decides whose
+# clipboard is read.
+#
+# The fish conf.d snippet clip-shim.fish puts this directory first in PATH.
+if [ -n "$TMUX" ] && command -v tmux >/dev/null 2>&1; then
+    eval "$(tmux show-environment -s DISPLAY 2>/dev/null)"
+    eval "$(tmux show-environment -s XAUTHORITY 2>/dev/null)"
+fi
+self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Find the real xclip on PATH, skipping this shim's directory.
+IFS=:
+for d in $PATH; do
+    [ "$d" = "$self_dir" ] && continue
+    [ -x "$d/xclip" ] && exec "$d/xclip" "$@"
+done
+echo "xclip shim: real xclip not found in PATH" >&2
+exit 127

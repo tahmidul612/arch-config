@@ -26,7 +26,9 @@ install_file() {  # src dest [mode]
 install_file "$here/tmux/tmux.conf"      "$HOME/.config/tmux/tmux.conf"
 install_file "$here/tmux/cheatsheet.tsv" "$HOME/.config/tmux/cheatsheet.tsv"
 install_file "$here/tmux/cheatsheet.sh"  "$HOME/.config/tmux/cheatsheet.sh" 755
+install_file "$here/tmux/bin/xclip"      "$HOME/.config/tmux/bin/xclip" 755
 install_file "$here/fish/conf.d/tmux-ssh-attach.fish" "$HOME/.config/fish/conf.d/tmux-ssh-attach.fish"
+install_file "$here/fish/conf.d/clip-shim.fish"       "$HOME/.config/fish/conf.d/clip-shim.fish"
 install_file "$here/fish/functions/tmux-help.fish"    "$HOME/.config/fish/functions/tmux-help.fish"
 
 if ! $dry && [[ ! -d "$HOME/.tmux/plugins/tpm" ]]; then

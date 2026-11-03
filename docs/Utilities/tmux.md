@@ -50,6 +50,8 @@ Finally, wire the agent sidebar into Claude Code (once per machine):
 | [`dotfiles/tmux/tmux.conf`](https://github.com/tahmidul612/arch-config/blob/main/dotfiles/tmux/tmux.conf) | `~/.config/tmux/` | The config |
 | `dotfiles/tmux/cheatsheet.tsv` | `~/.config/tmux/` | Curated cheatsheet entries, including plugin keys |
 | `dotfiles/tmux/cheatsheet.sh` | `~/.config/tmux/` | fzf viewer for the cheatsheet plus live bindings |
+| `dotfiles/tmux/bin/xclip` | `~/.config/tmux/bin/` | xclip shim so pasting images over SSH keeps working after a reconnect (see below) |
+| `dotfiles/fish/conf.d/clip-shim.fish` | `~/.config/fish/conf.d/` | Puts that shim first in `PATH` |
 | `dotfiles/fish/conf.d/tmux-ssh-attach.fish` | `~/.config/fish/conf.d/` | Auto-attach on interactive SSH login |
 | `dotfiles/fish/functions/tmux-help.fish` | `~/.config/fish/functions/` | `tmux-help` opens the cheatsheet outside tmux |
 | *(not in the repo)* `local.conf` | `~/.config/tmux/` | Per-machine overrides, see below |
@@ -100,8 +102,14 @@ tmux 3.8 also has native floating panes: ++ctrl+b++ ++asterisk++ opens one, ++ct
 - **Which host am I on?** The host name is in the status bar, in that machine's accent colour (set in `local.conf`).
 - **Clipboard.** Copying in copy mode (or from Claude Code) on the remote goes through OSC 52 to kitty, and lands in the local clipboard.
 
+- **Pasting images into Claude Code over SSH.** OSC 52 only carries text. To paste an image, Claude Code runs `xclip` on the host it is running on, so the remote host needs your local clipboard through X11 forwarding:
+    - Client `~/.ssh/config`, in the server's `Host` block: `ForwardX11 yes` and `ForwardX11Trusted yes`. Trusted forwarding is required because Xwayland (KDE and GNOME on Wayland) has no SECURITY extension. Only do this for hosts you trust, since they get full access to your X display.
+    - Server: `X11Forwarding yes` in sshd, plus `xorg-xauth` and `xclip` installed.
+    - The `xclip` shim takes `DISPLAY` from the tmux session, which tmux updates on every attach. So a Claude Code session started under an earlier SSH connection still pastes from the current one. If the same session is attached both locally and over SSH, whichever attached last decides whose clipboard is read.
+    - Check it: copy an image locally, then on the remote, inside tmux, run `xclip -selection clipboard -t TARGETS -o`. The output should include `image/png`.
+
 !!! note "Mosh"
-    [Mosh](mosh.md) can't pass extended keys or kitty graphics. Over mosh, use ++ctrl+j++ instead of ++shift+enter++ in Claude Code, and yazi shows no image previews. Plain `ssh` (or `kitten ssh`) supports both.
+    [Mosh](mosh.md) can't pass extended keys or kitty graphics. Over mosh, use ++ctrl+j++ instead of ++shift+enter++ in Claude Code, and yazi shows no image previews. Mosh doesn't do X11 forwarding either, so image paste doesn't work over it. Plain `ssh` (or `kitten ssh`) supports all three.
 
 ## Usage
 
