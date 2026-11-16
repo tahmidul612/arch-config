@@ -12,6 +12,7 @@ Usage:
     resmon.py status                         # quick sanity check of the database
     resmon.py export  [--out-dir DIR]        # 7d/30d JSON + reports, local copies
     resmon.py push week|month [--dry-run]    # send a review to the Claude scheduled task
+    resmon.py watch [--hours 3] [--dry-run]  # alert if an app stays pinned for hours
 
 Stdlib only. GPU data comes from nvidia-smi when present.
 """
@@ -268,6 +269,11 @@ class Collector:
         self.db = sqlite3.connect(DB_PATH)
         self.db.executescript(SCHEMA)
         self.db.execute("PRAGMA journal_mode=WAL")
+        # Cap the WAL left on disk after a checkpoint. A reader that holds a snapshot
+        # for hours still blocks checkpoints (that grew it to 12 GB once), so readers
+        # must stay short; the export unit's timeout enforces that.
+        self.db.execute(f"PRAGMA journal_size_limit={64 * 1048576}")
+        self.samples_taken = 0
         self.prev_cpu = cpu_times()
         self.prev_vm = vmstat()
         self.prev_proc: dict[int, tuple[int, int]] = {}  # pid -> (starttime, ticks)
@@ -367,6 +373,9 @@ class Collector:
                              v["vram"], v["sm"]))
         self.db.executemany("INSERT INTO groups VALUES (?,?,?,?,?,?,?,?)", rows)
         self.db.commit()
+        self.samples_taken += 1
+        if self.samples_taken % 120 == 0:  # ~hourly; PASSIVE never waits on readers
+            self.db.execute("PRAGMA wal_checkpoint(PASSIVE)")
 
     def run(self):
         time.sleep(min(self.interval, 5))
@@ -507,9 +516,10 @@ def report(days: float) -> str:
     w("## Where the RAM goes\n")
     w("Average share of RAM over the whole period (PSS where readable, so shared libraries are split fairly).\n")
     w("| App / service | avg (all time) | avg when running | peak | running | biggest processes |\n|---|---|---|---|---|---|")
-    details = dict(db.execute("""SELECT grp, detail FROM groups g1 WHERE ts >= ? AND mem_kb =
-                                 (SELECT MAX(mem_kb) FROM groups g2 WHERE g2.grp = g1.grp AND g2.ts >= ?)""",
-                              (since, since)).fetchall())
+    # One pass: SQLite takes the bare `detail` column from the row holding MAX(mem_kb).
+    # (A correlated subquery here was O(rows x rows-per-app) and ran for ~21 h at 2.4M rows.)
+    details = {g: d for g, d, _ in db.execute(
+        "SELECT grp, detail, MAX(mem_kb) FROM groups WHERE ts >= ? GROUP BY grp", (since,))}
     for r in sorted(rows, key=lambda r: -r["avg_mem_all"])[:20]:
         w(f"| {r['grp']} | {gb(r['avg_mem_all'])} | {gb(r['avg_mem'])} | {gb(r['max_mem'])} | "
           f"{100 * r['presence']:.0f}% | {details.get(r['grp'], '')} |")
@@ -864,6 +874,103 @@ def status() -> str:
             f"({age:.0f}s ago)\n")
 
 
+# --------------------------------------------------------------------------- watch (early alerts)
+
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "resmon"
+ALERT_STATE = STATE_DIR / "alerts.json"
+
+
+def stuck_apps(until: int, hours: float, min_cpu: float) -> list[dict]:
+    """Apps pinned at >= min_cpu (% of one core) for the whole window.
+
+    Uses the 10th percentile, not the mean, so a busy-but-bursty app (a Plex
+    transcode, a compile) doesn't count; only something that never let go does.
+    """
+    since = until - int(hours * 3600)
+    db = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    n = db.execute("SELECT COUNT(*) FROM samples WHERE ts > ? AND ts <= ?", (since, until)).fetchone()[0]
+    if n < hours * 3600 / 30 * 0.8:  # PC off / collector down for part of the window
+        return []
+    per: dict[str, list[float]] = defaultdict(list)
+    for grp, cpu in db.execute("SELECT grp, cpu_pct FROM groups WHERE ts > ? AND ts <= ?", (since, until)):
+        per[grp].append(cpu)
+    out = []
+    for grp, vals in per.items():
+        if len(vals) < 0.9 * n:
+            continue
+        p10 = pct(vals + [0.0] * (n - len(vals)), 10)
+        if p10 >= min_cpu:
+            out.append({"app": grp, "p10_cpu": round(p10), "avg_cpu": round(sum(vals) / n), "hours": hours})
+    return sorted(out, key=lambda a: -a["avg_cpu"])
+
+
+def describe_app(grp: str) -> str:
+    """container:<id> -> 'Docker <name> (compose <project>, <dir>)'."""
+    m = re.match(r"container:([0-9a-f]{12})$", grp)
+    if not m or not shutil.which("docker"):
+        return grp
+    try:
+        out = subprocess.run(
+            ["docker", "inspect", m.group(1), "--format",
+             '{{.Name}}|{{index .Config.Labels "com.docker.compose.project"}}|'
+             '{{index .Config.Labels "com.docker.compose.project.working_dir"}}'],
+            capture_output=True, text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return grp
+    if not out:
+        return grp
+    name, proj, wd = (out.split("|") + ["", ""])[:3]
+    extra = ", ".join(x for x in (f"compose {proj}" if proj else "", wd) if x)
+    return f"Docker {name.lstrip('/')} [{m.group(1)}]" + (f" ({extra})" if extra else "")
+
+
+def notify(title: str, body: str):
+    """Desktop notification, plus a ping to any reachable KDE Connect device (the phone)."""
+    try:
+        subprocess.run(["notify-send", "-a", "resmon", "-u", "critical", title, body], timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if shutil.which("kdeconnect-cli"):
+        try:
+            ids = subprocess.run(["kdeconnect-cli", "-a", "--id-only"], capture_output=True,
+                                 text=True, timeout=10).stdout.split()
+            for dev in ids:
+                subprocess.run(["kdeconnect-cli", "-d", dev, "--ping-msg", f"{title}: {body}"], timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    cmd = load_conf().get("RESMON_ALERT_CMD")  # optional hook: gets title/body as $1/$2
+    if cmd:
+        try:
+            subprocess.run(["sh", "-c", cmd, "resmon-alert", title, body], timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
+def watch(hours: float, min_cpu: float, cooldown_h: float, until: int | None, dry_run: bool):
+    import json
+    now = int(time.time())
+    hits = stuck_apps(until or now, hours, min_cpu)
+    try:
+        state = json.loads(ALERT_STATE.read_text())
+    except (OSError, ValueError):
+        state = {}
+    fresh = [h for h in hits if now - state.get(h["app"], 0) >= cooldown_h * 3600]
+    for h in hits:
+        print(f"stuck: {h['app']} avg {h['avg_cpu']}% p10 {h['p10_cpu']}% of a core for {hours:g} h"
+              + ("" if h in fresh else " (already alerted)"))
+    if dry_run or not fresh:
+        return
+    lines = [f"{describe_app(h['app'])}: ~{h['avg_cpu']}% of a core for {hours:g}+ h" for h in fresh]
+    notify(f"resmon: {len(fresh)} process(es) stuck busy", "\n".join(lines))
+    db = sqlite3.connect(DB_PATH, timeout=10)
+    db.executemany("INSERT INTO events VALUES (?,?,?)", [(now, "stuck_busy", l) for l in lines])
+    db.commit()
+    for h in fresh:
+        state[h["app"]] = now
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    ALERT_STATE.write_text(json.dumps(state))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -878,7 +985,16 @@ def main():
     pu = sub.add_parser("push", help="send a review to the Claude scheduled task")
     pu.add_argument("kind", choices=["week", "month"])
     pu.add_argument("--dry-run", action="store_true", help="print the payload instead of sending")
+    wa = sub.add_parser("watch", help="alert when an app stays pinned for hours")
+    wa.add_argument("--hours", type=float, default=3)
+    wa.add_argument("--min-cpu", type=float, default=80, help="%% of ONE core, 10th percentile over the window")
+    wa.add_argument("--cooldown", type=float, default=24, help="hours before re-alerting the same app")
+    wa.add_argument("--until", type=int, help="window end as a unix ts (replay)")
+    wa.add_argument("--dry-run", action="store_true", help="print hits, don't notify")
     a = ap.parse_args()
+    if a.cmd == "watch":
+        watch(a.hours, a.min_cpu, a.cooldown, a.until, a.dry_run)
+        return
     if a.cmd == "push":
         push(a.kind, a.dry_run)
         return

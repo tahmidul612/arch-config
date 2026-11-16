@@ -10,8 +10,8 @@ UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 PY="$(command -v python3)"
 
 if [[ "${1:-}" == "--remove" ]]; then
-  systemctl --user disable --now resmon.service resmon-export.timer resmon-push-week.timer resmon-push-month.timer 2>/dev/null || true
-  rm -f "$UNIT_DIR"/resmon.service "$UNIT_DIR"/resmon-export.{service,timer} "$UNIT_DIR"/resmon-push@.service "$UNIT_DIR"/resmon-push-{week,month}.timer
+  systemctl --user disable --now resmon.service resmon-export.timer resmon-watch.timer resmon-push-week.timer resmon-push-month.timer 2>/dev/null || true
+  rm -f "$UNIT_DIR"/resmon.service "$UNIT_DIR"/resmon-{export,watch}.{service,timer} "$UNIT_DIR"/resmon-push@.service "$UNIT_DIR"/resmon-push-{week,month}.timer
   systemctl --user daemon-reload
   echo "Removed. Data kept in ${XDG_DATA_HOME:-$HOME/.local/share}/resmon"
   exit 0
@@ -43,7 +43,39 @@ Description=resmon summary export
 [Service]
 Type=oneshot
 Nice=19
+IOSchedulingClass=idle
+# Guards: a normal export takes seconds. Oneshot units have no start timeout by
+# default, and a runaway export once held a read snapshot for days, pinning a
+# core and growing the WAL to 12 GB. Kill it instead.
+TimeoutStartSec=15min
+CPUQuota=50%
+MemoryMax=2G
 ExecStart=$PY $DIR/resmon.py export --out-dir $DIR/exports
+UNIT
+
+# Early warning: every 15 min, alert (desktop + KDE Connect) if any app has been
+# pinned at >= 80% of a core for 3 h straight. The weekly email is too late.
+cat > "$UNIT_DIR/resmon-watch.service" <<UNIT
+[Unit]
+Description=resmon stuck-process check
+
+[Service]
+Type=oneshot
+Nice=19
+TimeoutStartSec=2min
+ExecStart=$PY $DIR/resmon.py watch --hours 3 --min-cpu 80
+UNIT
+
+cat > "$UNIT_DIR/resmon-watch.timer" <<UNIT
+[Unit]
+Description=resmon stuck-process check every 15 min
+
+[Timer]
+OnCalendar=*:0/15
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
 UNIT
 
 cat > "$UNIT_DIR/resmon-export.timer" <<UNIT
@@ -69,6 +101,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+TimeoutStartSec=10min
 ExecStart=$PY $DIR/resmon.py push %i
 UNIT
 
@@ -114,7 +147,8 @@ ENV
 fi
 
 systemctl --user daemon-reload
-systemctl --user enable --now resmon.service resmon-export.timer resmon-push-week.timer resmon-push-month.timer
+systemctl --user enable --now resmon.service resmon-export.timer resmon-watch.timer resmon-push-week.timer resmon-push-month.timer
+systemctl --user restart resmon.service   # pick up collector code changes
 [[ "${1:-}" == "--linger" ]] && loginctl enable-linger "$USER"
 
 sleep 70

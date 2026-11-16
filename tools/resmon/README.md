@@ -34,7 +34,25 @@ Data lives in `~/.local/share/resmon/resmon.db` (~3–5 MB/day).
 ./resmon.py export                   # writes exports/summary-{7d,30d}.json + reports
 ```
 
-`resmon-export.timer` refreshes `exports/` hourly (local copies only).
+`resmon-export.timer` refreshes `exports/` hourly (local copies only). A normal
+export takes ~15 s; the unit is killed after 15 min and capped at half a core.
+
+## Stuck-process alerts
+
+`resmon-watch.timer` runs `resmon.py watch` every 15 min. If any app has sat at
+≥ 80% of one core for 3 h straight (10th percentile, so bursty work like a Plex
+transcode doesn't count), it sends a desktop notification and a KDE Connect
+ping to any reachable device, and logs a `stuck_busy` row in `events`. Each
+app alerts at most once per 24 h (state in `~/.local/state/resmon/alerts.json`).
+Docker containers are named with their compose project and directory.
+
+```bash
+./resmon.py watch --dry-run                    # what's stuck right now
+./resmon.py watch --until <unix-ts> --dry-run  # replay a past window
+```
+
+To also get alerts elsewhere, set `RESMON_ALERT_CMD` in `routines.env`; it runs
+with the title and body as `$1` and `$2`.
 
 ## Weekly and monthly reviews
 
