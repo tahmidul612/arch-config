@@ -51,6 +51,7 @@ Finally, wire the agent sidebar into Claude Code (once per machine):
 | `dotfiles/tmux/cheatsheet.tsv` | `~/.config/tmux/` | Curated cheatsheet entries, including plugin keys |
 | `dotfiles/tmux/cheatsheet.sh` | `~/.config/tmux/` | fzf viewer for the cheatsheet plus live bindings |
 | `dotfiles/tmux/bin/xclip` | `~/.config/tmux/bin/` | xclip shim so pasting images over SSH keeps working after a reconnect (see below) |
+| `dotfiles/tmux/bin/claude-browser` | `~/.config/tmux/bin/` | `BROWSER` for Claude Code, so links open locally from a long-running session (see below) |
 | `dotfiles/fish/conf.d/clip-shim.fish` | `~/.config/fish/conf.d/` | Puts that shim first in `PATH` |
 | `dotfiles/fish/conf.d/tmux-ssh-attach.fish` | `~/.config/fish/conf.d/` | Auto-attach on interactive SSH login |
 | `dotfiles/fish/conf.d/tmux-kitty-attach.fish` | `~/.config/fish/conf.d/` | Auto-attach in every new local kitty window |
@@ -109,6 +110,14 @@ tmux 3.8 also has native floating panes: ++ctrl+b++ ++asterisk++ opens one, ++ct
     - Server: `X11Forwarding yes` in sshd, plus `xorg-xauth` and `xclip` installed.
     - The `xclip` shim takes `DISPLAY` from the tmux session, which tmux updates on every attach. So a Claude Code session started under an earlier SSH connection still pastes from the current one. If the same session is attached both locally and over SSH, whichever attached last decides whose clipboard is read.
     - Check it: copy an image locally, then on the remote, inside tmux, run `xclip -selection clipboard -t TARGETS -o`. The output should include `image/png`.
+
+- **Opening links from Claude Code.** A Claude Code session started while tmux was attached over SSH has no `DISPLAY` or `WAYLAND_DISPLAY`, so it shows "Couldn't open a browser" even after you reattach locally. `claude-browser` takes the live display variables from `systemctl --user show-environment` and runs `xdg-open`. If the session was last attached over SSH, it fails on purpose, so Claude shows its copy-the-URL hint instead of opening a tab on the other machine. Enable it in `~/.claude/settings.json`:
+
+    ```json
+    { "env": { "BROWSER": "/home/<user>/.config/tmux/bin/claude-browser" } }
+    ```
+
+    Sessions that were already running need a restart (`claude --resume`) to pick it up.
 
 !!! note "Mosh"
     [Mosh](mosh.md) can't pass extended keys or kitty graphics. Over mosh, use ++ctrl+j++ instead of ++shift+enter++ in Claude Code, and yazi shows no image previews. Mosh doesn't do X11 forwarding either, so image paste doesn't work over it. Plain `ssh` (or `kitten ssh`) supports all three.

@@ -1,0 +1,41 @@
+#!/bin/sh
+# claude-browser: the BROWSER Claude Code uses to open links (artifacts, docs, login).
+#
+# Why: a long-running claude in a tmux pane keeps the environment of the moment it
+# started. If the session was attached over ssh then, the process has no DISPLAY or
+# WAYLAND_DISPLAY (and the tmux server, if it was started over ssh, also leaks stale
+# SSH_TTY/SSH_CLIENT). Claude then skips xdg-open with "Couldn't open a browser",
+# even after you reattach locally from kitty.
+#
+# What it does:
+#   1. If the most recent client of this tmux session attached over ssh (tmux keeps
+#      SSH_CONNECTION in update-environment), or we're in a plain ssh shell, fail, so
+#      Claude shows its "press c to copy" hint instead of opening a tab at home.
+#   2. Otherwise take the live graphical session's variables from the systemd user
+#      manager (Plasma exports them there) and run xdg-open with them. Without
+#      KDE_SESSION_VERSION, xdg-open falls back to kfmclient, which isn't installed.
+#
+# Set in ~/.claude/settings.json and ~/.claude-work/settings.json: env.BROWSER.
+
+if [ -n "$TMUX" ] && command -v tmux >/dev/null 2>&1; then
+    case "$(tmux show-environment SSH_CONNECTION 2>/dev/null)" in
+        SSH_CONNECTION=*) echo "claude-browser: tmux session last attached over ssh" >&2; exit 1 ;;
+    esac
+elif [ -n "$SSH_CONNECTION" ]; then
+    echo "claude-browser: running over ssh" >&2
+    exit 1
+fi
+
+graphical=$(systemctl --user show-environment 2>/dev/null |
+    grep -E '^(DISPLAY|WAYLAND_DISPLAY|XAUTHORITY|KDE_SESSION_VERSION|KDE_FULL_SESSION|XDG_CURRENT_DESKTOP|XDG_SESSION_DESKTOP)=')
+if [ -z "$graphical" ]; then
+    echo "claude-browser: no graphical session in the systemd user environment" >&2
+    exit 1
+fi
+
+# Values come from systemd's own environment (no spaces in these), one per line.
+for kv in $graphical; do
+    export "$kv"
+done
+
+exec xdg-open "$@"
