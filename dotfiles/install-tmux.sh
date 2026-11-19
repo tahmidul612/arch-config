@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the shared tmux setup (config, cheatsheet, fish SSH auto-attach) for this user.
+# Install the shared tmux setup (config, cheatsheet, fish SSH/kitty auto-attach) for this user.
 # Canonical copy lives in my private laptop dotfiles repo; this is the shipped copy.
 # Per-machine overrides go in an untracked ~/.config/tmux/local.conf.
 #   ./dotfiles/install-tmux.sh            install (backs up anything it replaces)
@@ -28,6 +28,7 @@ install_file "$here/tmux/cheatsheet.tsv" "$HOME/.config/tmux/cheatsheet.tsv"
 install_file "$here/tmux/cheatsheet.sh"  "$HOME/.config/tmux/cheatsheet.sh" 755
 install_file "$here/tmux/bin/xclip"      "$HOME/.config/tmux/bin/xclip" 755
 install_file "$here/fish/conf.d/tmux-ssh-attach.fish" "$HOME/.config/fish/conf.d/tmux-ssh-attach.fish"
+install_file "$here/fish/conf.d/tmux-kitty-attach.fish" "$HOME/.config/fish/conf.d/tmux-kitty-attach.fish"
 install_file "$here/fish/conf.d/clip-shim.fish"       "$HOME/.config/fish/conf.d/clip-shim.fish"
 install_file "$here/fish/functions/tmux-help.fish"    "$HOME/.config/fish/functions/tmux-help.fish"
 
