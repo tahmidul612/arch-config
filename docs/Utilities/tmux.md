@@ -99,7 +99,7 @@ tmux 3.8 also has native floating panes: ++ctrl+b++ ++asterisk++ opens one, ++ct
 
 ## SSH and nesting
 
-- **Local auto-attach.** Every new kitty window or tab attaches to the most recently used tmux session, or creates `main` if none exists. It's skipped inside tmux and over SSH. To get a plain kitty shell: `NOTMUX=1 kitty`, or detach with ++ctrl+b++ ++d++.
+- **Local auto-attach.** Every new kitty window or tab gets its own tmux session: it reattaches the most recently used detached session (say, one left over after closing kitty), otherwise starts a new one (`main` if none exist). It never joins a session another window is already showing. It is skipped inside tmux and over SSH. To get a plain kitty shell: `NOTMUX=1 kitty`, or detach with ++ctrl+b++ ++d++.
 - **Auto-attach.** Interactive SSH logins run `tmux new -A -s main`. Non-interactive `ssh host cmd`, scp and scripts are left alone. To skip it: `ssh -t host 'NOTMUX=1 fish'`. Detaching (++ctrl+b++ ++d++) drops you to a normal shell on the host.
 - **Nesting.** On the laptop, ++f12++ turns the local tmux off: its status bar shows `OFF` and every key, including ++ctrl+b++, goes to the remote tmux. ++f12++ again turns it back on. Only a locally started tmux binds ++f12++, so you can't switch off both layers by accident.
 - **Which host am I on?** The host name is in the status bar, in that machine's accent colour (set in `local.conf`).
