@@ -1,0 +1,7 @@
+[Unit]
+Description=Attach Xbox controller (USB %i) to the win11 VM if it is running
+After=libvirtd.service virtqemud.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/xbox-vm-attach %i

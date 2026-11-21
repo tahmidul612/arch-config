@@ -1,0 +1,2 @@
+# Hand the Xbox controller to the win11 VM when it is plugged in while the VM runs.
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="045e", ATTR{idProduct}=="0b12", RUN+="/usr/bin/systemctl --no-block start xbox-vm-attach@%k.service"

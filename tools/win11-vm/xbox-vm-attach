@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Attach the Xbox controller (045e:0b12) to the win11 VM when it is plugged in while the VM runs.
+Started by xbox-vm-attach@<kernel-usb-name>.service from a udev rule. Also detaches stale entries
+for controllers that no longer exist (left behind when the pad re-enumerates)."""
+import os, subprocess, sys, time, xml.etree.ElementTree as ET
+
+VM, URI, VID, PID = os.environ.get("VM", "win11"), "qemu:///system", "0x045e", "0x0b12"
+
+def virsh(*args, check=True):
+    return subprocess.run(["virsh", "-c", URI, *args], capture_output=True, text=True, check=check)
+
+def hostdev_xml(bus, dev):
+    return (f"<hostdev mode='subsystem' type='usb' managed='yes'><source>"
+            f"<vendor id='{VID}'/><product id='{PID}'/><address bus='{bus}' device='{dev}'/>"
+            f"</source></hostdev>")
+
+def apply(action, xml):
+    path = f"/run/xbox-vm-{os.getpid()}.xml"
+    with open(path, "w") as f:
+        f.write(xml)
+    try:
+        r = virsh(action, VM, path, "--live", check=False)
+        print(f"{action}: {(r.stdout + r.stderr).strip()}")
+        return r.returncode == 0
+    finally:
+        os.unlink(path)
+
+def main():
+    kname = sys.argv[1] if len(sys.argv) > 1 else ""
+    if virsh("domstate", VM, check=False).stdout.strip() != "running":
+        print(f"{VM} not running, nothing to do"); return
+    sysdir = f"/sys/bus/usb/devices/{kname}"
+    for _ in range(20):                      # sysfs attrs can lag the udev event slightly
+        if os.path.exists(f"{sysdir}/devnum"):
+            break
+        time.sleep(0.25)
+    else:
+        print(f"no sysfs entry for {kname!r}"); return
+    bus = int(open(f"{sysdir}/busnum").read()); dev = int(open(f"{sysdir}/devnum").read())
+
+    root = ET.fromstring(virsh("dumpxml", VM).stdout)
+    attached = False
+    for hd in root.findall("./devices/hostdev[@type='usb']"):
+        src = hd.find("source")
+        if src is None or src.find("vendor").get("id") != VID or src.find("product").get("id") != PID:
+            continue
+        a = src.find("address")
+        if a is None:
+            continue
+        b, d = int(a.get("bus")), int(a.get("device"))
+        if (b, d) == (bus, dev):
+            attached = True
+        elif not os.path.exists(f"/dev/bus/usb/{b:03d}/{d:03d}"):
+            apply("detach-device", hostdev_xml(b, d))      # stale entry from a previous plug
+    if attached:
+        print(f"controller {bus}:{dev} already attached"); return
+    apply("attach-device", hostdev_xml(bus, dev))
+
+main()
