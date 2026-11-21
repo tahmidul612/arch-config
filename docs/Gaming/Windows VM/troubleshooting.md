@@ -6,7 +6,7 @@
 
 Remote Play 9.5 dies about 20 seconds after launch: Event Viewer shows Application Error 1000 for `RemotePlay.exe`, exception `0xc0000005`, faulting module "unknown". Two causes were found:
 
-1. **ViGEmBus is installed.** Remote Play 9.x deliberately crashes when it finds ViGEmBus (its crash info names it as "Badware ViGemBus"; see [DS4Windows issue #27](https://github.com/Ryochan7/DS4Windows/issues/27)). Uninstall ViGEmBus *and* delete its service, because the MSI uninstall leaves it behind: `sc.exe delete ViGEmBus`.
+1. **ViGEmBus is installed.** Remote Play 9.x deliberately crashes when it finds ViGEmBus (its crash info names it as "Badware ViGemBus"; see [DS4Windows issue #27](https://github.com/ds4windowsapp/DS4Windows/issues/27)). Uninstall ViGEmBus *and* delete its service, because the MSI uninstall leaves it behind: `sc.exe delete ViGEmBus`.
 2. **Something else in this VM.** With ViGEmBus gone, and with Deskflow stopped as well, 9.5 still crashed. The cause was not found; detection of the VM is a guess.
 
 Fix: use the [patched 8.5](windows-guest.md#ps-remote-play-85-patched). It runs fine in the same VM.
@@ -82,7 +82,7 @@ What was tried and dropped, with the reason. None of these are steps to follow.
 | --- | --- | --- |
 | 4 vCPU, unpinned (original) | Superseded | Showed as 4 one-core sockets; Windows client uses at most 2. Replaced by 8 vCPU in one socket, pinned. |
 | macvtap on the wired NIC (bridge mode) | Failed | Meant to avoid double NAT. The guest got a LAN address but no internet (DNS resolved, ping and HTTPS failed). The cause is only guessed (the router not letting new devices online). Back on libvirt NAT, which works. |
-| Legacy IGD passthrough | Not used | QEMU 10.1+ limits it to Gen 6–9; `x-igd-lpc` is i440fx-only. |
+| Legacy IGD passthrough | Not used | QEMU 10.1+ limits it to Gen 6-9; `x-igd-lpc` is i440fx-only. |
 | GOPv17 ROM, firmware IGD-primary | Not needed | The noGOP ROM worked. |
 | Hiding the hypervisor from Windows | Not tried | Low odds of fixing the 9.5 crash, small slowdown. |
 
@@ -143,4 +143,5 @@ Each with the test that would settle it.
 | Does the Game Bar setting matter? | Toggle `UseNexusForGameBarEnabled` and press PS in Remote Play. |
 | Mic input | Use a voice chat in a game; or remove the `<input>` stream. |
 | Idle shutdown over days | Read `idle-shutdown.log` after a week of normal use. |
+| Deskflow in Looking Glass mode | Play a session with Deskflow stopped and see whether the Looking Glass client's own input is enough. |
 | DS4 gadget as a service | A user unit plus a libvirt hook that re-attaches the DS4 after each VM start. |

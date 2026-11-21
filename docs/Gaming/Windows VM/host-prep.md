@@ -27,7 +27,7 @@ What: [`host-setup.sh`](https://github.com/tahmidul612/arch-config/blob/main/too
 4. Writes `/etc/mkinitcpio.conf.d/20-vfio-igpu.conf` so the vfio modules are in the initramfs.
 5. Installs the ROM to `/usr/local/share/vfio/` and regenerates `grub.cfg` and the initramfs.
 
-Why the ROM: QEMU's IGD passthrough has two modes. Legacy mode is limited to Gen 6–9 iGPUs on QEMU 10.1+ and its `x-igd-lpc` option only works on i440fx machines, so this setup uses **UPT mode** on the q35 machine. UPT mode needs an option ROM with the iGPU's OpRegion, and the "noGOP" ROM is the one that project recommends for UPT.
+Why the ROM: QEMU's IGD passthrough has two modes. Legacy mode is limited to Gen 6-9 iGPUs on QEMU 10.1+ and its `x-igd-lpc` option only works on i440fx machines, so this setup uses **UPT mode** on the q35 machine. UPT mode needs an option ROM with the iGPU's OpRegion, and the "noGOP" ROM is the one that project recommends for UPT.
 
 ```bash
 cd tools/win11-vm
@@ -43,7 +43,7 @@ reboot
 ```bash
 grep -o 'intel_iommu=on iommu=pt' /proc/cmdline
 lspci -nnk -s 00:02.0 | grep 'driver in use'     # Kernel driver in use: vfio-pci
-ls /sys/kernel/iommu_groups/*/devices/ | grep -B1 0000:00:02.0   # alone in its group
+for g in /sys/kernel/iommu_groups/*/devices/0000:00:02.0; do ls "$(dirname "$g")"; done   # only 0000:00:02.0
 ```
 
 On this machine the iGPU is alone in IOMMU group 0.

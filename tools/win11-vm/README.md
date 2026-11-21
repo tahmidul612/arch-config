@@ -21,7 +21,7 @@ Nothing here contains secrets. Where a file needs a user, host or path from your
 | `deskflow/Deskflow.guest.conf` | guest `C:\ProgramData\Deskflow\Deskflow.conf` | copy with the guest agent | Default |
 | `deskflow/make-certs.sh` | writes `./host/` and `./guest/` TLS files | run once, copy the results | Default |
 | `ds4-host-prep.sh` | `/etc/udev/rules.d/70-raw-gadget.rules`, loads `dummy_hcd` + `raw_gadget` | `sudo ./ds4-host-prep.sh` | Default |
-| `ds4gadget.py`, `ds4_report_desc.bin` | run from here | `./ds4gadget.py [--log FILE] [--no-pad]` | Default (started by hand) |
+| `ds4gadget.py`, `ds4_report_desc.bin` | run from here | `python3 ds4gadget.py [--log FILE] [--no-pad]` | Default (started by hand) |
 | `xbox-vm-attach`, `xbox-vm-attach@.service`, `99-xbox-vm-attach.rules`, `xbox-vm-attach-install.sh` | `/usr/local/bin/`, `/etc/systemd/system/`, `/etc/udev/rules.d/` | `sudo ./xbox-vm-attach-install.sh` | Superseded: worked, but Remote Play ignores an Xbox pad; `ds4-host-prep.sh` disables the rule |
 
 ## Differences from the copies that were run

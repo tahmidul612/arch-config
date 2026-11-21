@@ -2,7 +2,7 @@
 
 QEMU plays the VM's sound straight into the host's PipeWire. There is no viewer in between, so sound works whatever display mode is in use.
 
-Status: **working**. Verdict after real use (2026-11-21), on VM audio during Remote Play: "Works and in sync."
+Status: **working**. Verdict after real use (2026-11-21), on VM audio during Remote Play: "Works and in sync." That verdict covers the PipeWire backend going straight to the speakers. The `win11_vm` sink below was added afterwards and has been checked with a test recording and a VM restart, not yet in a play session.
 
 ```text
 Windows "Speakers (High Definition Audio Device)"  (ich9)
@@ -60,7 +60,7 @@ In the guest, `Get-PnpDevice -Class AudioEndpoint` shows "Speakers (High Definit
 
 ## Not verified yet
 
-- **Microphone.** The XML also creates an input stream `win11-mic`, which PipeWire connects to the default source (a webcam mic here). Nothing has used it. Remove the `<input>` line if you don't want the VM to have a mic.
+- Microphone: the XML also creates an input stream `win11-mic`, which PipeWire connects to the default source (a webcam mic here). Nothing has used it. Remove the `<input>` line if you don't want the VM to have a mic.
 - The 20 ms latency was not tuned or measured.
 
 ## Files

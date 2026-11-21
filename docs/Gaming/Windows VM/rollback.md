@@ -1,5 +1,8 @@
 # Rollback
 
+!!! warning "Not exercised"
+    These steps are the inverse of what was set up, but none of them has been run on this machine yet. Read each one before running it.
+
 Every change can be undone on its own. Take an XML backup before each step ([VM definition](vm-definition.md)), named after what comes next, for example:
 
 | Backup | Taken before | Restores |

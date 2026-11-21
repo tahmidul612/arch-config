@@ -1,12 +1,12 @@
 # Windows VM for PS Remote Play
 
-A PS5 at a remote site, played from this desktop with Sony's official PS Remote Play client. The client runs in a Windows 11 VM (libvirt/QEMU) because nothing on Linux can reach this console. [chiaki-ng](https://github.com/streetpea/chiaki-ng) needs a one-time registration over the console's LAN or a reachable IP, and the remote site allows neither. The official client connects through PSN with nothing set up at the other end.
+A PS5 at a remote site, played from this desktop with Sony's official PS Remote Play client. The client runs in a Windows 11 VM (libvirt/QEMU) because nothing on Linux can reach this console. [chiaki-ng](https://github.com/chiaki-ng/chiaki-ng) needs a one-time registration over the console's LAN or a reachable IP, and the remote site allows neither. The official client connects through PSN with nothing set up at the other end.
 
 To make that playable, the VM gets:
 
-- the CPU's **Intel UHD 770 iGPU**, passed through with VFIO, for video decode and a real display output
-- a **virtual DualShock 4** made on the host from an Xbox controller, because Remote Play accepts only Sony controllers
-- **Deskflow** for the host's keyboard and mouse, **PipeWire** for sound, and the guest agent for automation
+- the CPU's Intel UHD 770 iGPU, passed through with VFIO, for video decode and a real display output
+- a virtual DualShock 4 made on the host from an Xbox controller, because Remote Play accepts only Sony controllers
+- Deskflow for the host's keyboard and mouse, PipeWire for sound, and the guest agent for automation
 
 ## How it fits together
 
@@ -25,7 +25,7 @@ To make that playable, the VM gets:
  libvirt NAT 192.168.122.1  <---------------------------->  192.168.122.x -> internet -> PSN
 ```
 
-There are two ways to see the VM: a **Looking Glass** window on the host (the default) or the monitor plugged straight into the iGPU's HDMI port, switched over with DDC/CI.
+There are two ways to see the VM: a Looking Glass window on the host (the default) or the monitor plugged straight into the iGPU's HDMI port, switched over with DDC/CI.
 
 ## Status
 
@@ -34,12 +34,12 @@ As of 2026-11-21. "Confirmed" means it was used in a real session; "tested" mean
 | Part | Choice | Status |
 | --- | --- | --- |
 | Client | PS Remote Play 8.5.0.08070, patched to report 9.5 | Confirmed |
-| CPU | 8 vCPU, one socket, pinned to P-cores 8–15, emulator on E-cores 16–19 | In use; benefit not measured |
+| CPU | 8 vCPU, one socket, pinned to P-cores 8-15, emulator on E-cores 16-19 | In use; benefit not measured |
 | Network | libvirt NAT `default` | Confirmed |
 | iGPU | VFIO, UPT mode, `Universal_noGOP_igd.rom`, Intel driver 32.0.101.7088 | Confirmed |
 | Controller | Virtual DS4 from the Xbox pad (`ds4gadget.py`), started by hand | Confirmed (6+ hours of play) |
-| Keyboard and mouse | Deskflow 1.27, TLS pinned, UFW rule on `virbr0` | Confirmed (mouse, keyboard, clipboard) |
-| Audio | QEMU PipeWire backend, `win11_vm` loopback sink | Confirmed ("works and in sync"); restart routing tested |
+| Keyboard and mouse | Deskflow 1.27, TLS pinned, UFW rule on `virbr0` | Confirmed on the HDMI monitor (mouse, keyboard, clipboard); role with Looking Glass undecided |
+| Audio | QEMU PipeWire backend, `win11_vm` loopback sink | Backend confirmed ("works and in sync"); the loopback sink was added later and is tested only |
 | Idle shutdown | `IdleShutdown` task: 60 min without input and without a stream | Running; not yet observed over days |
 | Old: Xbox pad in the VM + ViGEmBus | | Failed; Remote Play ignores it |
 | Old: Remote Play 9.5 | | Failed; crashes in this VM |
@@ -60,7 +60,7 @@ The helper files are in [`tools/win11-vm/`](https://github.com/tahmidul612/arch-
 
 ```bash
 virsh -c qemu:///system start win11
-cd tools/win11-vm && ./ds4gadget.py --log /tmp/ds4gadget.log &   # with the Xbox pad plugged in
+cd tools/win11-vm && python3 ds4gadget.py --log /tmp/ds4gadget.log &   # with the Xbox pad plugged in
 virsh -c qemu:///system attach-device win11 /tmp/ds4-hostdev.xml --live   # see Input
 # play; the VM shuts itself down after an hour idle, or:
 virsh -c qemu:///system shutdown win11 --mode agent

@@ -41,10 +41,10 @@ Do this only for a new VM. For an existing one, apply the sections below to its 
 </cpu>
 ```
 
-- **8 vCPU in one socket** (4 cores, 2 threads). The original 4 vCPU showed up as 4 one-core sockets. Windows client editions use at most 2 sockets, so one socket is the safe layout.
-- **Pinning:** on the i7-12700K, host CPUs 0–15 are the 8 P-cores with their hyperthreads and 16–19 are E-cores. The vCPUs get 4 P-cores (8–15) and the QEMU emulator threads get E-cores (16–19). That is the reasoning; nobody measured whether pinning made a difference.
-- **`maxphysaddr limit='39'`** is the IOMMU width from [Host preparation](host-prep.md#4-read-the-iommu-address-width).
-- **Memory** stays at 8 GiB. `memballoon` is `none` (a Looking Glass requirement).
+- 8 vCPU in one socket (4 cores, 2 threads). The original 4 vCPU showed up as 4 one-core sockets. Windows client editions use at most 2 sockets, so one socket is the safe layout.
+- Pinning: on the i7-12700K, host CPUs 0-15 are the 8 P-cores with their hyperthreads and 16-19 are E-cores. The vCPUs get 4 P-cores (8-15) and the QEMU emulator threads get E-cores (16-19). That is the reasoning; nobody measured whether pinning made a difference.
+- `maxphysaddr limit='39'` is the IOMMU width from [Host preparation](host-prep.md#4-read-the-iommu-address-width).
+- Memory stays at 8 GiB. `memballoon` is `none` (a Looking Glass requirement).
 
 Check from the host after a start:
 
@@ -53,15 +53,15 @@ virsh -c qemu:///system vcpupin win11
 virsh -c qemu:///system emulatorpin win11
 ```
 
-For idle and in-game CPU baselines, and for alerts when the VM sits at high CPU for hours, see [resmon](https://github.com/tahmidul612/arch-config/blob/main/tools/resmon/README.md). Measured on 2026-11-21: an idle guest uses 10–25% of one host core; Remote Play plus guest OBS recording used 140–160%.
+For idle and in-game CPU baselines, and for alerts when the VM sits at high CPU for hours, see [resmon](https://github.com/tahmidul612/arch-config/blob/main/tools/resmon/README.md). Measured on 2026-11-21: an idle guest uses 10-25% of one host core; Remote Play plus guest OBS recording used 140-160%.
 
 ## iGPU passthrough
 
 Three pieces: free guest slot 2, pass the device there, and give QEMU the OpRegion.
 
-**Free guest slot `00:02.0`.** In UPT mode the iGPU has to sit at the same address in the guest as on the host. virt-manager had put 8 `pcie-root-port` controllers at slot `0x02`. Move them to a free slot (`0x04` here; check with `grep "slot='0x04'"` that nothing uses it) by changing only `slot='0x02'` to `slot='0x04'` in their `<address>` lines. Windows later shows the old ports as phantom PCI bridges; they are harmless.
+Free guest slot `00:02.0` first. In UPT mode the iGPU has to sit at the same address in the guest as on the host. virt-manager had put 8 `pcie-root-port` controllers at slot `0x02`. Move them to a free slot (`0x04` here; check with `grep "slot='0x04'"` that nothing uses it) by changing only `slot='0x02'` to `slot='0x04'` in their `<address>` lines. Windows later shows the old ports as phantom PCI bridges; they are harmless.
 
-**The hostdev:**
+Then add the hostdev:
 
 ```xml
 <hostdev mode='subsystem' type='pci' managed='yes'>
@@ -74,7 +74,7 @@ Three pieces: free guest slot 2, pass the device there, and give QEMU the OpRegi
 </hostdev>
 ```
 
-**The OpRegion override.** libvirt has no element for it, so it goes through the QEMU namespace. The root element must declare it:
+Finally, the OpRegion override. libvirt has no element for it, so it goes through the QEMU namespace. The root element must declare it:
 
 ```xml
 <domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
@@ -89,7 +89,7 @@ Three pieces: free guest slot 2, pass the device there, and give QEMU the OpRegi
 </domain>
 ```
 
-**Keep the emulated display.** `virtio-vga` with SPICE (and the local VNC) stays in the XML. It shows the boot screens and is the console if the iGPU output fails. Nothing else uses it.
+Keep the emulated display: `virtio-vga` with SPICE (and the local VNC) stays in the XML. It shows the boot screens and is the console if the iGPU output fails. Nothing else uses it.
 
 Check: the VM starts (QEMU accepted the device), and Windows lists a "Video Controller" without a driver until [the Intel driver](windows-guest.md#intel-graphics-driver) is installed.
 

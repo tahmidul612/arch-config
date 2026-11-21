@@ -8,7 +8,7 @@ Two separate things: the host's keyboard and mouse reaching Windows (Deskflow), 
 
 It was picked after comparing the open-source options (2026-11-21): Deskflow 1.27 (active, GPL-2.0, official Windows MSI and an Arch package), Lan Mouse 0.11 (younger, weak clipboard; the fallback if Deskflow misbehaves on Wayland, never tried), Input Leap (archived) and Barrier (dead, X11 only).
 
-Status: **working**. Confirmed in real use (2026-11-21): mouse crossing, keyboard and clipboard.
+Status: **working** with the monitor on the iGPU's HDMI port. Confirmed in real use (2026-11-21): mouse crossing, keyboard and clipboard. With the Looking Glass window as the display, the Looking Glass client passes keyboard and mouse itself, and whether Deskflow is still needed there is undecided.
 
 ### 1. Certificates
 
@@ -59,7 +59,7 @@ mkdir -p /tmp/df && cd /tmp/df
     ss -ltn | grep 24800        # listening on 0.0.0.0:24800
     ```
 
-    The first time the cursor crosses over, KDE asks to allow input capture.
+    KDE may ask you to allow input capture the first time the cursor crosses over.
 
 ### 3. Guest (client)
 
@@ -132,7 +132,7 @@ Plug in the Xbox controller, then:
 
 ```bash
 cd tools/win11-vm
-./ds4gadget.py --log /tmp/ds4gadget.log &       # waits for the pad, then enumerates the DS4
+python3 ds4gadget.py --log /tmp/ds4gadget.log &  # waits for the pad, then enumerates the DS4
 lsusb -d 054c:05c4                               # the DS4 is on the host's USB
 
 cat > /tmp/ds4-hostdev.xml <<'EOF'
