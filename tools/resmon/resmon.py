@@ -167,6 +167,9 @@ def group_name(pid: int, comm: str) -> str:
         m = re.match(r"^(?:docker|libpod)-([0-9a-f]{12})", name)
         if m:
             return f"container:{m.group(1)}"
+        m = re.match(r"^machine-qemu-\d+-(.+)$", name)  # libvirt bumps the number every boot
+        if m:
+            return f"vm:{m.group(1)}"
         if name.startswith("app-"):
             name = name[4:]
             name = re.sub(r"^(flatpak|gnome|kde|cosmic)-", "", name)
@@ -904,8 +907,54 @@ def stuck_apps(until: int, hours: float, min_cpu: float) -> list[dict]:
     return sorted(out, key=lambda a: -a["avg_cpu"])
 
 
+GUEST_TOP_PS = r"""
+$a = @{}; Get-Process | ? Id -ne $PID | % { $a[$_.Id] = $_.CPU }
+Start-Sleep 5
+$t = Get-Process | % { if ($a.ContainsKey($_.Id)) { [pscustomobject]@{N=$_.Name; P=($_.CPU - $a[$_.Id]) / 5 * 100} } }
+($t | Sort P -Desc | Select -First 4 | ? { $_.P -ge 5 } | % { '{0} {1:N0}%' -f $_.N, $_.P }) -join ', '
+"""
+
+
+def vm_guest_top(dom: str) -> str | None:
+    """Busiest processes inside a libvirt guest, via qemu-guest-agent (Windows guests).
+
+    Lets a 'stuck VM' alert say whether the guest is doing real work (a game,
+    a recording) or something is spinning. None if the agent isn't reachable.
+    """
+    import base64
+    import json
+    if not shutil.which("virsh"):
+        return None
+    enc = base64.b64encode(GUEST_TOP_PS.encode("utf-16-le")).decode()
+
+    def qga(cmd: dict) -> dict:
+        out = subprocess.run(["virsh", "-c", "qemu:///system", "qemu-agent-command", dom,
+                              json.dumps(cmd), "--timeout", "10"],
+                             capture_output=True, text=True, timeout=20)
+        if out.returncode:
+            raise OSError(out.stderr.strip())
+        return json.loads(out.stdout)["return"]
+    try:
+        pid = qga({"execute": "guest-exec", "arguments": {
+            "path": "powershell.exe", "capture-output": True,
+            "arg": ["-NoProfile", "-NonInteractive", "-EncodedCommand", enc]}})["pid"]
+        for _ in range(15):
+            time.sleep(2)
+            st = qga({"execute": "guest-exec-status", "arguments": {"pid": pid}})
+            if st.get("exited"):
+                text = base64.b64decode(st.get("out-data", "")).decode("utf-8", "replace").strip()
+                return text.splitlines()[-1] if text else "nothing busy"
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def describe_app(grp: str) -> str:
-    """container:<id> -> 'Docker <name> (compose <project>, <dir>)'."""
+    """container:<id> -> 'Docker <name> (compose <project>, <dir>)'; vm:<dom> -> guest's top processes."""
+    m = re.match(r"vm:(.+)$", grp)
+    if m:
+        top = vm_guest_top(m.group(1))
+        return f"VM {m.group(1)}" + (f" (inside: {top})" if top else " (guest agent unreachable)")
     m = re.match(r"container:([0-9a-f]{12})$", grp)
     if not m or not shutil.which("docker"):
         return grp

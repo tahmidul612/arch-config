@@ -46,6 +46,13 @@ ping to any reachable device, and logs a `stuck_busy` row in `events`. Each
 app alerts at most once per 24 h (state in `~/.local/state/resmon/alerts.json`).
 Docker containers are named with their compose project and directory.
 
+libvirt VMs are grouped as `vm:<domain>`. libvirt's own scope name,
+`machine-qemu-<N>-<domain>`, gets a new N on every boot. A VM alert also asks
+the guest, through qemu-guest-agent, for its busiest processes, e.g.
+`VM win11 (inside: RemotePlay 60%, obs64 35%)`. That shows whether a long
+session was real work or something left spinning. It needs `virsh` access to
+`qemu:///system` and a Windows guest with the agent running.
+
 ```bash
 ./resmon.py watch --dry-run                    # what's stuck right now
 ./resmon.py watch --until <unix-ts> --dry-run  # replay a past window
