@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LG monitor: rescue host displays
+Comment=Failsafe: turn every host display back on and bring the LG back to DP
+Exec=/home/<USER>/.local/bin/lg-input rescue
+Icon=video-display
+Terminal=false
+NoDisplay=false
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true

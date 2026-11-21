@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LG monitor: show the host
+Comment=LG back on the host (DP); the VM is shown through the Looking Glass client
+Exec=/home/<USER>/.local/bin/vm-display lg
+Icon=video-display
+Terminal=false
+NoDisplay=false
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true

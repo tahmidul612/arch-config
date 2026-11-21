@@ -1,0 +1,15 @@
+[Unit]
+Description=LG monitor input watcher (host DP-1 off while the LG shows the win11 VM; handles the VM's switch requests)
+Documentation=file:%h/.local/bin/lg-input
+PartOf=graphical-session.target
+After=graphical-session.target plasma-workspace.target
+
+[Service]
+ExecStart=%h/.local/bin/lg-input watch
+# failsafe: whenever the watcher stops (logout, crash, systemctl stop), give the LG output back to the host
+ExecStopPost=%h/.local/bin/lg-input sync --force
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

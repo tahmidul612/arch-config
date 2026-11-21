@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LG monitor: toggle host / VM
+Comment=Switch the LG HDR 4K between the Linux host (DP) and the win11 VM (HDMI)
+Exec=/home/<USER>/.local/bin/lg-input toggle
+Icon=video-display
+Terminal=false
+NoDisplay=false
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true

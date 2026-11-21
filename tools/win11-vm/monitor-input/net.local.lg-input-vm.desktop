@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LG monitor: show the VM
+Comment=Show the win11 VM directly on the LG over HDMI
+Exec=/home/<USER>/.local/bin/vm-display hdmi
+Icon=video-display
+Terminal=false
+NoDisplay=false
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true

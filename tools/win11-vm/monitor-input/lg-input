@@ -1,0 +1,473 @@
+#!/usr/bin/env python3
+"""lg-input: switch the LG HDR 4K between the host (DisplayPort, host output DP-1)
+and the win11 VM (HDMI-1, driven by the passed-through Intel iGPU).
+
+Why it works this way (found by testing, 2026-11-21):
+  * The host can talk DDC to the LG only while the LG shows DP; the VM only while it shows HDMI.
+    So "to HDMI" is sent by the host, "to DP" is sent by the VM (through the guest agent).
+  * The standard input-select command (VCP 0x60) only half-switches this LG: the picture moves,
+    but the LG's own input setting stays stale and it pops up "out of range". LG's private
+    command (VCP 0xF4 from DDC source address 0x50: 0x90 = HDMI-1, 0xD0 = DP) sets it properly.
+    Windows' monitor API can't send from 0x50, so the VM side uses Intel IGCL raw I2C
+    (C:\\Tools\\monitor\\lg-igcl.ps1).
+  * Host -> VM: the host's F4 is ignored most of the time, so the host sends 0x60=0x11 (moves the
+    picture) and the VM then sends F4=0x90 over HDMI (sets the LG's input properly).
+    VM -> host: the VM sends F4=0xD0. Both confirmed clean in use (menu right, no warning).
+  * The LG ignores a switch to an input with no signal: the VM's HDMI output must be on.
+  * With ~/.local/bin/vm-display installed (Looking Glass "lg" mode vs direct "hdmi" mode), toggle,
+    the VM's requests and rescue go through it; the watcher is passive while its mode is "lg".
+  * Reading the input: host DDC answering 0x0f => DP. Host DDC silent + VM DDC answering 0x11
+    => HDMI. Neither => LG off/asleep/elsewhere ("unknown"); automation never acts on unknown.
+
+Commands:
+  lg-input status            print dp | hdmi | unknown (+ details with -v)
+  lg-input hdmi [--force]    show the VM (refuses if the VM can't switch it back, unless --force)
+  lg-input dp                show the host
+  lg-input toggle            hdmi <-> dp (unknown -> dp, the safe side)
+  lg-input sync              apply the host layout for the current state (DP-1 off while the LG shows the VM)
+  lg-input rescue            failsafe: restore every host display, try to bring the LG back to DP
+  lg-input auto on|off       enable/pause the watcher's automatic layout changes
+  lg-input watch             the watcher (run by lg-input-watch.service)
+"""
+import argparse, base64, fcntl, json, os, re, subprocess, sys, time
+from pathlib import Path
+
+VM = os.environ.get('VM', 'win11')
+LG_MODEL = 'LG HDR 4K'
+LG_OUT = 'DP-1'            # host output wired to the LG
+OTHER_OUT = 'DP-2'         # the host's other monitor (LG UltraFine)
+DP, HDMI = 0x0F, 0x11
+VM_TOOL = r'C:\Tools\monitor\lg-igcl.ps1'
+VM_REQ = r'C:\Tools\monitor\request.txt'
+KVM_STATE = Path('/tmp/kvm-display-state')   # optional: another display tool's "hands off" marker; the watcher stands down while it exists
+VM_DISPLAY = Path.home() / '.local/bin/vm-display'      # Looking Glass "lg" mode vs direct "hdmi" mode
+VM_DISPLAY_MODE = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'vm-display/mode'
+
+STATE = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'lg-input'
+LAYOUT = STATE / 'layout.json'          # host layout saved before DP-1 is turned off
+MANAGED = STATE / 'dp1-disabled-by-lg-input'
+AUTO_OFF = STATE / 'auto-disabled'
+LOCK = Path(os.environ.get('XDG_RUNTIME_DIR', '/tmp')) / 'lg-input.lock'
+# Used when no saved layout exists (matches the setup on 2026-11-21).
+DEFAULT_LAYOUT = {LG_OUT: {'mode': '3840x2160@60', 'pos': [0, 0], 'scale': 1.5, 'priority': 1},
+                  OTHER_OUT: {'pos': [2560, 0], 'priority': 2}}
+
+VERBOSE = False
+
+def log(msg):
+    print(time.strftime('%H:%M:%S ') + msg, flush=True)
+
+def vlog(msg):
+    if VERBOSE:
+        log(msg)
+
+def notify(msg, urgent=False):
+    log('NOTIFY: ' + msg)
+    try:
+        subprocess.run(['notify-send', '-a', 'LG input', '-i', 'video-display',
+                        '-u', 'critical' if urgent else 'normal', 'LG monitor', msg], timeout=5)
+    except Exception:
+        pass
+
+def run(cmd, timeout=20):
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return p.returncode, p.stdout, p.stderr
+    except subprocess.TimeoutExpired:
+        return 124, '', 'timeout'
+
+class Lock:
+    """Serialises every mutating action between the watcher, shortcuts and the CLI."""
+    def __enter__(self):
+        STATE.mkdir(parents=True, exist_ok=True)
+        self.f = open(LOCK, 'w')
+        for _ in range(300):            # wait up to 30 s for another action to finish
+            try:
+                fcntl.flock(self.f, fcntl.LOCK_EX | fcntl.LOCK_NB); return self
+            except BlockingIOError:
+                time.sleep(0.1)
+        raise SystemExit('another lg-input action is still running')
+    def __exit__(self, *a):
+        fcntl.flock(self.f, fcntl.LOCK_UN); self.f.close()
+
+# ---------------------------------------------------------------- host DDC (ddcutil over DP)
+_bus = None
+def host_bus():
+    global _bus
+    if _bus is not None:
+        return _bus
+    rc, out, _ = run(['ddcutil', 'detect', '--terse'], 30)
+    for block in out.split('\n\n'):
+        m = re.search(r'/dev/i2c-(\d+)', block)
+        if m and (f'-{LG_OUT}\n' in block + '\n' or f':{LG_MODEL}:' in block):
+            _bus = int(m.group(1)); return _bus
+    return None
+
+def host_read():
+    """LG input code as seen over DP, or None if the LG doesn't answer there."""
+    bus = host_bus()
+    if bus is None:
+        return None
+    rc, out, _ = run(['ddcutil', '-b', str(bus), '--brief', 'getvcp', '60'], 15)
+    m = re.search(r'VCP 60 SNC x([0-9a-fA-F]+)', out)
+    return int(m.group(1), 16) if rc == 0 and m else None
+
+def host_send_hdmi():
+    bus = host_bus()
+    if bus is None:
+        return False
+    # Standard select; the VM commits it with LG's F4 afterwards (see the header).
+    # The LG switches mid-transaction, so ddcutil may report a failure even when it worked.
+    run(['ddcutil', '-b', str(bus), '--noverify', 'setvcp', '60', '0x11'], 15)
+    return True
+
+# ---------------------------------------------------------------- VM (libvirt + guest agent)
+_conn = None
+def dom():
+    global _conn
+    import libvirt
+    libvirt.registerErrorHandler(lambda *a: None, None)
+    try:
+        if _conn is None or not _conn.isAlive():
+            _conn = libvirt.open('qemu:///system')
+        return _conn.lookupByName(VM)
+    except libvirt.libvirtError:
+        _conn = None
+        return None
+
+def vm_running():
+    import libvirt
+    d = dom()
+    try:
+        return bool(d and d.state()[0] == libvirt.VIR_DOMAIN_RUNNING)
+    except libvirt.libvirtError:
+        return False
+
+def qga(cmd, timeout=10):
+    import libvirt, libvirt_qemu
+    d = dom()
+    if d is None:
+        return None
+    try:
+        return json.loads(libvirt_qemu.qemuAgentCommand(d, json.dumps(cmd), timeout, 0)).get('return')
+    except libvirt.libvirtError:
+        return None
+
+def vm_ps(script, timeout=25):
+    """Run PowerShell in the guest as SYSTEM; returns stdout or None."""
+    enc = base64.b64encode(script.encode('utf-16-le')).decode()
+    r = qga({'execute': 'guest-exec', 'arguments': {'path': 'powershell.exe', 'capture-output': True,
+             'arg': ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', enc]}})
+    if not r:
+        return None
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        st = qga({'execute': 'guest-exec-status', 'arguments': {'pid': r['pid']}})
+        if st is None:
+            return None
+        if st.get('exited'):
+            return base64.b64decode(st.get('out-data', '')).decode('utf-8', 'replace')
+        time.sleep(0.3)
+    return None
+
+def vm_igcl(action):
+    out = vm_ps(f"& '{VM_TOOL}' {action}") if vm_running() else None
+    vlog(f'vm {action}: {(out or "no answer").strip()}')
+    return out or ''
+
+def vm_read():
+    """LG input code as seen over the VM's HDMI, or None."""
+    m = re.search(r'^input=0x([0-9a-f]+)', vm_igcl('probe'), re.M)
+    return int(m.group(1), 16) if m else None
+
+def vm_can_switch_back():
+    """Before handing the LG to the VM: guest agent answers and the iGPU's HDMI output exists."""
+    return vm_running() and 'output[' in vm_igcl('probe')
+
+# ---------------------------------------------------------------- state
+def status():
+    if KVM_STATE.exists():
+        vlog('external display mode active (KVM_STATE)')
+    h = host_read()
+    vlog(f'host DDC: {h if h is None else hex(h)}')
+    if h is not None:
+        return 'dp' if h == DP else f'0x{h:02x}'
+    v = vm_read()
+    if v is not None:
+        return 'hdmi' if v == HDMI else f'0x{v:02x}'
+    return 'unknown'
+
+def wait_for(target, secs=12):
+    t0 = time.time()
+    while time.time() - t0 < secs:
+        time.sleep(1.5)
+        if target == 'dp' and host_read() == DP:
+            return True
+        if target == 'hdmi' and vm_read() == HDMI:
+            return True
+    return False
+
+# ---------------------------------------------------------------- host layout (kscreen)
+def kscreen():
+    rc, out, _ = run(['kscreen-doctor', '-j'], 15)
+    return {o['name']: o for o in json.loads(out)['outputs']} if rc == 0 else {}
+
+def mode_name(o):
+    for m in o.get('modes', []):
+        if m['id'] == o.get('currentModeId'):
+            return f"{m['size']['width']}x{m['size']['height']}@{round(m['refreshRate'])}"
+    return None
+
+def save_layout(outs):
+    lg, other = outs[LG_OUT], outs[OTHER_OUT]
+    data = {LG_OUT: {'mode': mode_name(lg) or DEFAULT_LAYOUT[LG_OUT]['mode'],
+                     'pos': [lg['pos']['x'], lg['pos']['y']], 'scale': lg.get('scale', 1.5),
+                     'priority': lg.get('priority', 1)},
+            OTHER_OUT: {'pos': [other['pos']['x'], other['pos']['y']], 'priority': other.get('priority', 2)}}
+    LAYOUT.write_text(json.dumps(data, indent=1))
+
+def lg_out_off():
+    """Turn the host's LG output off while the LG shows the VM; the other monitor becomes primary."""
+    outs = kscreen()
+    lg, other = outs.get(LG_OUT), outs.get(OTHER_OUT)
+    if KVM_STATE.exists():
+        vlog('external display mode active (KVM_STATE): leaving the layout alone'); return
+    if not lg or not lg.get('enabled'):
+        return
+    if not other or not other.get('enabled') or not other.get('connected'):
+        notify(f'Not turning off {LG_OUT}: {OTHER_OUT} is not enabled, it would leave no host display.'); return
+    save_layout(outs)
+    rc, _, err = run(['kscreen-doctor', f'output.{LG_OUT}.disable', f'output.{OTHER_OUT}.priority.1'])
+    if rc == 0:
+        MANAGED.touch(); log(f'{LG_OUT} off, {OTHER_OUT} primary')
+    else:
+        notify(f'Could not turn off {LG_OUT}: {err.strip()}')
+
+def lg_out_on(force=False):
+    """Restore the host's LG output (a fresh modeset, which also avoids a stale DP link)."""
+    outs = kscreen()
+    lg = outs.get(LG_OUT)
+    if not lg or (lg.get('enabled') and not force):
+        MANAGED.unlink(missing_ok=True); return
+    if not force and not MANAGED.exists():
+        vlog(f'{LG_OUT} was turned off by someone else; leaving it'); return
+    try:
+        lay = json.loads(LAYOUT.read_text())
+    except Exception:
+        lay = DEFAULT_LAYOUT
+    a, b = lay[LG_OUT], lay[OTHER_OUT]
+    args = [f'output.{LG_OUT}.enable', f"output.{LG_OUT}.mode.{a['mode']}",
+            f"output.{LG_OUT}.position.{a['pos'][0]},{a['pos'][1]}", f"output.{LG_OUT}.scale.{a['scale']}",
+            f"output.{LG_OUT}.priority.{a['priority']}"]
+    if outs.get(OTHER_OUT, {}).get('enabled'):
+        args += [f"output.{OTHER_OUT}.position.{b['pos'][0]},{b['pos'][1]}", f"output.{OTHER_OUT}.priority.{b['priority']}"]
+    rc, _, err = run(['kscreen-doctor'] + args)
+    if rc != 0:   # fall back to a bare enable so the screen is at least on
+        run(['kscreen-doctor', f'output.{LG_OUT}.enable', f'output.{LG_OUT}.priority.1'])
+    MANAGED.unlink(missing_ok=True)
+    log(f'{LG_OUT} restored')
+
+def sync(state=None, force=False):
+    state = state or status()
+    if state == 'hdmi' and vm_running():
+        lg_out_off()
+    elif state in ('dp',) or not vm_running():
+        lg_out_on(force=force)
+    # unknown with the VM running: leave everything as it is
+
+# ---------------------------------------------------------------- actions
+def switch(target, force=False):
+    with Lock():
+        cur = status()
+        if target == 'toggle':
+            target = 'hdmi' if cur == 'dp' else 'dp'
+        log(f'switch: {cur} -> {target}')
+        if target == cur:
+            sync(cur, force=(target == 'dp')); return 0
+        if target == 'hdmi':
+            if cur != 'dp':
+                notify("Can't switch to the VM: the host can only send that while the LG shows DP "
+                       f'(current state: {cur}).', urgent=True); return 1
+            if not force and not vm_can_switch_back():
+                notify('Not switching to the VM: it is off or its guest agent/HDMI output is not answering, '
+                       'so nothing could switch the LG back. Use --force to override.', urgent=True); return 1
+            for attempt in (1, 2):
+                host_send_hdmi()
+                if wait_for('hdmi'):
+                    vm_igcl('hdmi')              # commit with LG's own command so its OSD input matches
+                    sync('hdmi'); return 0
+                if host_read() == DP:
+                    continue                  # still on DP: the command was lost, retry
+                break
+            if host_read() is None and vm_read() is None:
+                notify('The LG left DP but the VM cannot see it on HDMI. Press the LG joystick > Input > '
+                       'DisplayPort, then run "lg-input rescue".', urgent=True)
+            else:
+                notify('The LG stayed on DP. It ignores a switch to an input with no signal, so the VM\'s '
+                       'HDMI output is probably off (Windows display settings, or the Looking Glass '
+                       '"Make LG the only monitor" preference).', urgent=True)
+            return 1
+        # target == 'dp': give the LG a fresh host signal first, then ask the VM to switch
+        lg_out_on(force=True)
+        if cur == 'hdmi' or vm_running():
+            for attempt in (1, 2):
+                vm_igcl('dp')
+                if wait_for('dp'):
+                    return 0
+        if host_read() == DP:
+            return 0
+        notify('Could not bring the LG back to DP' + ('' if vm_running() else ' (the VM is off)') +
+               '. Press the LG joystick > Input > DisplayPort.', urgent=True)
+        return 1
+
+def rescue():
+    """Failsafe: every host display back on, LG to DP if anything can reach it."""
+    with Lock():
+        lg_out_on(force=True)
+        outs = kscreen()
+        if outs.get(OTHER_OUT) and not outs[OTHER_OUT].get('enabled'):
+            run(['kscreen-doctor', f'output.{OTHER_OUT}.enable'])
+        if host_read() != DP and vm_running():
+            vm_igcl('dp'); wait_for('dp')
+        st = status()
+        if st != 'dp':
+            notify(f'Host displays restored, but the LG is not on DP (state: {st}). '
+                   'Press the LG joystick > Input > DisplayPort.', urgent=True)
+        else:
+            notify('Host displays restored; LG on DP.')
+        return 0 if st == 'dp' else 1
+
+def display_mode():
+    try:
+        return VM_DISPLAY_MODE.read_text().strip()
+    except OSError:
+        return None
+
+def via_vm_display(action):
+    """toggle/hdmi/dp through vm-display when it's installed (keeps its mode, guest layout and the
+    Looking Glass client consistent). Returns None when vm-display isn't there."""
+    if not VM_DISPLAY.exists():
+        return None
+    if action == 'toggle':
+        action = 'lg' if display_mode() == 'hdmi' else 'hdmi'
+    action = {'dp': 'lg'}.get(action, action)
+    log(f'via vm-display {action}')
+    rc, out, err = run([str(VM_DISPLAY), action], 180)
+    if out.strip() or err.strip():
+        vlog((out + err).strip())
+    return rc
+
+# ---------------------------------------------------------------- watcher
+def take_vm_request():
+    """The VM's shortcut drops C:\\Tools\\monitor\\request.txt; consume it (cheap guest-file-open poll)."""
+    h = qga({'execute': 'guest-file-open', 'arguments': {'path': VM_REQ, 'mode': 'r'}}, 5)
+    if h is None:
+        return None
+    r = qga({'execute': 'guest-file-read', 'arguments': {'handle': h, 'count': 64}}, 5) or {}
+    qga({'execute': 'guest-file-close', 'arguments': {'handle': h}}, 5)
+    vm_ps(f"Remove-Item -LiteralPath '{VM_REQ}' -Force -EA SilentlyContinue", 10)
+    req = base64.b64decode(r.get('buf-b64', '')).decode('ascii', 'ignore').strip().lower()
+    return req if req in ('toggle', 'hdmi', 'dp', 'rescue') else None
+
+def watch():
+    log('watcher started')
+    miss_dp = miss_hdmi = 0
+    next_confirm = next_eval = 0.0
+    was_running = None
+    while True:
+        try:
+            running = vm_running()
+            if running != was_running:
+                log(f'VM {"running" if running else "not running"}'); was_running = running
+                if not running:
+                    if display_mode() == 'hdmi' and VM_DISPLAY.exists():
+                        via_vm_display('lg')              # VM gone: back to the default mode (DP-1 on, Deskflow off)
+                    else:
+                        with Lock():
+                            lg_out_on()                   # VM gone: the host gets its screen back
+            if running:
+                req = take_vm_request()
+                if req:
+                    log(f'request from the VM: {req}')
+                    if req == 'rescue':
+                        rescue()
+                    elif via_vm_display(req) is None:
+                        switch(req)
+                    miss_dp = miss_hdmi = 0
+            now = time.time()
+            if (now >= next_eval and not AUTO_OFF.exists() and not KVM_STATE.exists()
+                    and display_mode() != 'lg'):
+                next_eval = now + 4
+                lg = kscreen().get(LG_OUT, {})
+                if not running:
+                    pass          # nothing to automate; lg_out_on() already ran when the VM stopped
+                elif lg.get('enabled'):
+                    # LG output on: watch for the LG leaving DP (button press, or switched from the VM)
+                    if host_read() is None:
+                        miss_dp += 1
+                    else:
+                        miss_dp = 0
+                    if miss_dp >= 2 and now >= next_confirm:
+                        if vm_read() == HDMI:
+                            with Lock():
+                                lg_out_off()
+                            miss_dp = 0
+                        else:
+                            next_confirm = now + 30       # off / asleep / host DPMS: back off
+                elif MANAGED.exists():
+                    # we turned the LG output off: watch for the LG leaving HDMI
+                    if vm_read() is None:
+                        miss_hdmi += 1
+                    else:
+                        miss_hdmi = 0
+                    if miss_hdmi >= 2:
+                        with Lock():
+                            lg_out_on()
+                        miss_hdmi = 0
+        except Exception as e:                            # never let the watcher die on a glitch
+            log(f'watcher error: {e!r}')
+            time.sleep(5)
+        time.sleep(2)
+
+def main():
+    global VERBOSE
+    ap = argparse.ArgumentParser(prog='lg-input', description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('cmd', choices=['status', 'hdmi', 'vm', 'dp', 'host', 'toggle', 'sync', 'rescue', 'auto', 'watch'])
+    ap.add_argument('arg', nargs='?')
+    ap.add_argument('--force', action='store_true')
+    ap.add_argument('-v', '--verbose', action='store_true')
+    a = ap.parse_args()
+    VERBOSE = a.verbose or a.cmd == 'watch'
+    cmd = {'vm': 'hdmi', 'host': 'dp'}.get(a.cmd, a.cmd)
+    STATE.mkdir(parents=True, exist_ok=True)
+    if cmd == 'status':
+        print(status()); return 0
+    if cmd == 'toggle':
+        rc = via_vm_display('toggle')
+        return switch('toggle', force=a.force) if rc is None else rc
+    if cmd in ('hdmi', 'dp'):
+        return switch(cmd, force=a.force)
+    if cmd == 'sync':
+        with Lock():
+            sync(force=a.force)
+        return 0
+    if cmd == 'rescue':
+        rc = rescue()
+        if VM_DISPLAY.exists() and vm_running():
+            via_vm_display('lg')          # back to the default Looking Glass mode, outside our lock
+            rc = 0 if status() == 'dp' else rc
+        return rc
+    if cmd == 'auto':
+        if a.arg == 'off':
+            AUTO_OFF.touch(); print('automatic layout changes paused')
+        elif a.arg == 'on':
+            AUTO_OFF.unlink(missing_ok=True); print('automatic layout changes enabled')
+        else:
+            print('paused' if AUTO_OFF.exists() else 'enabled')
+        return 0
+    if cmd == 'watch':
+        watch()
+
+if __name__ == '__main__':
+    sys.exit(main() or 0)
