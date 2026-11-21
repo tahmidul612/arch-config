@@ -210,9 +210,12 @@ Each with the test that would settle it. Status as of 2026-11-21.
 | VM audio after a host reboot (a VM restart is already verified) | Reboot the host, start the VM, check `pactl list sink-inputs short`. Fallback: pin QEMU's stream to the sink in the XML. |
 | Virtual DS4: pad unplug during a session, VM stop and start, first host reboot | Do each once with `journalctl --user -u ds4-vm -f` open. |
 | `Display-lgonly-AtLogon` on the next VM boot | Boot the VM; `vm-display status` shows the Looking Glass monitor at 4K. |
-| hdmi mode at 4K60 over HDMI | If the LG shows "out of range", run `display-layout.ps1 -Layout hdmi` with `-Width 2560 -Height 1440`. |
 | Deskflow in hdmi mode | Move the mouse into the VM after `vm-display hdmi`. |
-| LG switching: shutdown hook, `rescue`, the watcher after a joystick switch | Shut Windows down in hdmi mode; press ++meta+ctrl+shift+f11++; switch with the joystick and watch `journalctl --user -u lg-input-watch`. |
+| LG switching: VM shutdown in hdmi mode (guest hook to DP, then the watcher runs `vm-display lg`) | Shut Windows down in hdmi mode and check that the LG lands on the Looking Glass client. |
+| `lg-input rescue` and its shortcut | Press ++meta+ctrl+shift+f11++ in hdmi mode. |
+| A manual joystick input switch in hdmi mode | The watcher should follow (DP-1 on/off), but `vm-display`'s stored mode does not change, so the next toggle may go the wrong way once. Switch with the joystick, then toggle. |
+| KDE shortcuts pressed for real, and after a re-login | They probably don't fire while Deskflow has the cursor in the VM; use ++ctrl+alt+f11++ there. |
+| Windows display sleep in hdmi mode | May make the watcher turn DP-1 off and on repeatedly. Let Windows blank the screen and watch `journalctl --user -u lg-input-watch`. |
 | Idle shutdown: no shutdown during controller-only play, shutdown after 60 min idle | Read `idle-shutdown.log` after both. |
 
 ### Not yet explained
