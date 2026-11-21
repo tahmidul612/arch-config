@@ -1,0 +1,10 @@
+[Unit]
+Description=Let libvirt-qemu reach the PipeWire socket (traverse-only ACL on $XDG_RUNTIME_DIR) for VM audio
+After=pipewire.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/setfacl -m u:libvirt-qemu:x %t
+
+[Install]
+WantedBy=default.target

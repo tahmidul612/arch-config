@@ -1,0 +1,14 @@
+[Unit]
+Description=Virtual "Windows VM" sink for the win11 VM audio (looped to the default output; OBS records its monitor)
+After=pipewire.service wireplumber.service
+Requires=pipewire.service
+
+[Service]
+ExecStart=/usr/bin/pw-loopback --name win11-vm-loopback \
+  --capture-props='media.class=Audio/Sink node.name=win11_vm node.description="Windows VM" audio.position=[FL FR] priority.session=0 priority.driver=0' \
+  --playback-props='node.name=win11_vm.output node.description="Windows VM (to speakers)" node.passive=true audio.position=[FL FR]'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
