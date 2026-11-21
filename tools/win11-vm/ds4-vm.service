@@ -1,0 +1,11 @@
+[Unit]
+Description=Virtual DualShock 4 for PS Remote Play in the win11 VM (Xbox controller -> DS4, attached only while RemotePlay.exe runs)
+Documentation=file:%h/.local/lib/ds4-vm/ds4-vm.py
+
+[Service]
+ExecStart=/usr/bin/python3 -u %h/.local/lib/ds4-vm/ds4-vm.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -54,6 +54,7 @@ FEATURE_REPORTS = {
 
 # ---------------------------------------------------------------- logging
 LOG = sys.stdout
+VERBOSE = False
 def log(msg):
     LOG.write(f"{time.strftime('%H:%M:%S')}.{int(time.time()*1000)%1000:03d} {msg}\n"); LOG.flush()
 
@@ -95,14 +96,23 @@ def pad_thread(no_pad):
     BTN = {E.BTN_SOUTH: "cross", E.BTN_EAST: "circle", E.BTN_X: "square", E.BTN_Y: "triangle",
            E.BTN_TL: "l1", E.BTN_TR: "r1", E.BTN_SELECT: "share", E.BTN_START: "options",
            E.BTN_THUMBL: "l3", E.BTN_THUMBR: "r3", E.BTN_MODE: "ps", E.KEY_RECORD: "touch"}
+    def neutral():
+        with STATE.lock:
+            STATE.lx = STATE.ly = STATE.rx = STATE.ry = 128; STATE.l2 = STATE.r2 = 0
+            STATE.hx = STATE.hy = 0; STATE.btn.clear()
+    waiting_logged = False
     while True:
         dev = None
         for p in evdev.list_devices():
-            d = evdev.InputDevice(p)
+            try: d = evdev.InputDevice(p)
+            except OSError: continue
             if d.info.vendor == 0x045E and E.EV_ABS in d.capabilities():
                 dev = d; break
+            d.close()
         if not dev:
-            log("pad: no Xbox controller found, retrying in 2s"); time.sleep(2); continue
+            if not waiting_logged: log("pad: no Xbox controller plugged in; sending neutral input until one appears")
+            waiting_logged = True; time.sleep(1); continue
+        waiting_logged = False
         caps = {c: dev.absinfo(c) for c in (E.ABS_X, E.ABS_Y, E.ABS_RX, E.ABS_RY, E.ABS_Z, E.ABS_RZ) if c in dict(dev.capabilities()[E.EV_ABS])}
         log(f"pad: using {dev.path} '{dev.name}' axes={ {E.ABS[c] if isinstance(E.ABS[c], str) else E.ABS[c][0]: (a.min, a.max) for c, a in caps.items()} }")
         def norm(code, v, out_max=255):
@@ -122,10 +132,11 @@ def pad_thread(no_pad):
                         elif c == E.ABS_RZ: STATE.r2 = norm(c, v)
                         elif c == E.ABS_HAT0X: STATE.hx = v
                         elif c == E.ABS_HAT0Y: STATE.hy = v
-                if ev.type == E.EV_KEY and ev.value == 1:
+                if VERBOSE and ev.type == E.EV_KEY and ev.value == 1:
                     log(f"pad: key {E.KEY.get(ev.code) or E.BTN.get(ev.code)} -> {BTN.get(ev.code, '(unmapped)')}")
         except OSError as e:
-            log(f"pad: lost device ({e}), rescanning"); time.sleep(1)
+            neutral()                         # release everything so nothing stays "held" while unplugged
+            log(f"pad: controller unplugged ({e}); neutral input, waiting for it to come back"); time.sleep(1)
 
 # ---------------------------------------------------------------- gadget
 class Gadget:
@@ -258,6 +269,8 @@ class Gadget:
             try:
                 n = fcntl.ioctl(self.fd, RAW_EP_READ, buf, True)
                 d = bytes(buf[8:8 + n])
+                if d == getattr(self, "_last_out", None): continue   # Remote Play repeats the same output report
+                self._last_out = d
                 if d[:1] == b"\x05": log(f"OUT report 0x05: flags={d[1]:02x} rumble weak={d[4]} strong={d[5]} rgb={d[6]:02x}{d[7]:02x}{d[8]:02x}")
                 else: log(f"OUT data: {d.hex()}")
             except OSError as e:
@@ -277,10 +290,12 @@ class Gadget:
                 if t in (EV_RESET, EV_DISCONNECT): self.disable_eps()
 
 def main():
-    global LOG
+    global LOG, VERBOSE
     ap = argparse.ArgumentParser()
     ap.add_argument("--log"); ap.add_argument("--no-pad", action="store_true")
+    ap.add_argument("-v", "--verbose", action="store_true", help="log every button press")
     a = ap.parse_args()
+    VERBOSE = a.verbose
     if a.log: LOG = open(a.log, "a", buffering=1)
     log("ds4gadget starting")
     threading.Thread(target=pad_thread, args=(a.no_pad,), daemon=True).start()
