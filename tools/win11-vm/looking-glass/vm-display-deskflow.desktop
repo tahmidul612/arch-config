@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Deskflow (follows vm-display mode)
+Comment=Starts the Deskflow server only in vm-display hdmi mode; in lg mode Looking Glass passes input
+Exec=/bin/bash -c "sleep 8; /home/<USER>/.local/bin/vm-display deskflow sync"
+Icon=org.deskflow.deskflow
+X-KDE-autostart-phase=2

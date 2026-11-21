@@ -1,0 +1,101 @@
+#!/bin/bash
+# vm-display: choose how the LG HDR 4K shows the win11 VM.
+#   vm-display lg      (default) VM = Looking Glass monitor only; the LG stays on DP (host DP-1) and shows the
+#                      VM through looking-glass-client fullscreen on DP-1. Host OBS (vm-rec) records the same picture.
+#   vm-display hdmi    VM = LG on the iGPU HDMI as primary + Looking Glass extended; the LG input is switched to
+#                      HDMI-1 (lg-input), and lg-input's watcher turns host DP-1 off while the LG shows the VM.
+#                      Note: vm-rec then records the Looking Glass monitor, i.e. the *secondary* screen.
+#   vm-display toggle  lg <-> hdmi (what the LG-input shortcuts and the VM's Ctrl+Alt+F11 do, via lg-input)
+#   vm-display status  show the mode, LG input, VM layout and client state
+#   vm-display client  (re)start the Looking Glass client on DP-1 only
+#   vm-display deskflow on|off|sync   Deskflow server (keyboard/mouse into the VM off DP-2's left edge):
+#                      only needed in hdmi mode (in lg mode the Looking Glass client passes input itself).
+#                      lg stops it, hdmi starts it; 'sync' (run at login by the autostart entry) follows the mode.
+# Mode is stored in ~/.local/state/vm-display/mode. Failsafe: a failed switch to hdmi falls back to lg.
+set -uo pipefail
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/vm-display; mkdir -p "$STATE"
+HERE=$(dirname "$(readlink -f "$0")")     # install as a symlink: ln -s <repo>/tools/win11-vm/looking-glass/vm-display ~/.local/bin/
+VM=${VM:-win11}
+GUEST=$HERE/../guest-ps.py
+KWIN_JS=$HERE/lg-client-to-output.js
+LG_OUT=DP-1
+log(){ echo "$(date +%T) $*" | tee -a "$STATE/vm-display.log" >&2; }
+notify(){ notify-send -a "VM display" -i video-display "VM display" "$1" 2>/dev/null || true; }
+vm_running(){ [ "$(virsh -c qemu:///system domstate "$VM" 2>/dev/null)" = "running" ]; }
+guest_layout(){  # $1 = lgonly | hdmi | extended | status
+  vm_running || { log "VM not running: skipping guest layout $1"; return 3; }
+  local out
+  out=$("$GUEST" 60 <<PS 2>&1 | tr -d '\r' | grep -E '^(result=|Looking|LG HDR)'
+Start-ScheduledTask Display-$1; Start-Sleep 9; Get-Content C:\Tools\display\last-$1.out
+PS
+)
+  log "guest layout $1: $(echo "$out" | tr '\n' ' ')"
+  echo "$out" | grep -q '^result=0' || [ "$1" = status ]
+}
+client_stop(){ systemctl --user stop lg-client.service 2>/dev/null; pkill -f /usr/bin/looking-glass-client 2>/dev/null; true; }
+client_start(){
+  client_stop
+  systemd-run --user --unit=lg-client --collect -p Restart=on-failure -p RestartSec=3 looking-glass-client >/dev/null
+  sleep 3   # let the client map its window (the script is run twice below in case it was slow)
+  local id; id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$KWIN_JS" vm-display-lg 2>/dev/null)
+  if [ -n "$id" ]; then
+    qdbus6 org.kde.KWin /Scripting/Script"$id" org.kde.kwin.Script.run >/dev/null 2>&1
+    sleep 0.5; qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript vm-display-lg >/dev/null 2>&1
+    sleep 2; id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$KWIN_JS" vm-display-lg 2>/dev/null)
+    qdbus6 org.kde.KWin /Scripting/Script"$id" org.kde.kwin.Script.run >/dev/null 2>&1
+    sleep 0.5; qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript vm-display-lg >/dev/null 2>&1
+    log "looking-glass-client fullscreen on $LG_OUT"
+  else log "could not load the KWin script; client is running but may be on the wrong screen"; fi
+}
+DESKFLOW_DESKTOP=/usr/share/applications/org.deskflow.deskflow.desktop
+deskflow_running(){ pgrep -x deskflow >/dev/null || pgrep -f '^/usr/bin/deskflow-core server' >/dev/null; }
+deskflow_on(){
+  pgrep -x deskflow >/dev/null && return 0
+  # launch through the desktop entry so the portal gets an app id (a bare 'deskflow' fails with "An app id is required")
+  kioclient exec "$DESKFLOW_DESKTOP" >/dev/null 2>&1 &
+  for _ in $(seq 20); do sleep 0.5; pgrep -f '^/usr/bin/deskflow-core server' >/dev/null && { log "deskflow server started"; return 0; }; done
+  log "deskflow did not start"; return 1
+}
+deskflow_off(){
+  deskflow_running || return 0
+  pkill -x deskflow 2>/dev/null; sleep 1        # the GUI first, or it restarts the core
+  pkill -f '^/usr/bin/deskflow-core server' 2>/dev/null
+  for _ in $(seq 10); do deskflow_running || { log "deskflow stopped"; return 0; }; sleep 0.5; done
+  pkill -9 -x deskflow 2>/dev/null; pkill -9 -f '^/usr/bin/deskflow-core server' 2>/dev/null; log "deskflow killed"
+}
+deskflow_sync(){ if [ "$(cat "$STATE/mode" 2>/dev/null)" = hdmi ]; then deskflow_on; else deskflow_off; fi; }
+to_lg(){
+  echo lg > "$STATE/mode"
+  deskflow_off                              # the Looking Glass client passes keyboard/mouse in this mode
+  lg-input auto off >/dev/null
+  # switch the LG back to DP while the VM's HDMI is still alive (the VM sends that command), then trim the VM layout
+  [ "$(lg-input status)" = dp ] || lg-input dp || log "lg-input dp failed (press the LG joystick > Input > DisplayPort, then 'lg-input rescue')"
+  lg-input sync --force >/dev/null 2>&1   # make sure host DP-1 is on
+  guest_layout lgonly || log "guest lgonly layout failed"
+  vm_running && client_start || log "VM not running: client not started"
+  notify "LG shows the VM through Looking Glass (DP)"
+}
+to_hdmi(){
+  vm_running || { log "VM not running"; notify "VM is not running"; exit 1; }
+  client_stop
+  if ! guest_layout hdmi; then log "guest hdmi layout failed -> back to lg"; to_lg; exit 1; fi
+  sleep 3                                  # let the LG see a signal on HDMI before switching
+  echo hdmi > "$STATE/mode"
+  deskflow_on || log "deskflow failed to start: use the Looking Glass client or the VM's console for input"
+  lg-input auto on >/dev/null
+  if ! lg-input hdmi; then log "lg-input hdmi failed -> back to lg"; to_lg; exit 1; fi
+  notify "LG shows the VM directly over HDMI"
+}
+case "${1:-status}" in
+  lg)     to_lg ;;
+  hdmi)   to_hdmi ;;
+  toggle) if [ "$(cat "$STATE/mode" 2>/dev/null)" = hdmi ]; then to_lg; else to_hdmi; fi ;;
+  client) client_start ;;
+  deskflow) case "${2:-sync}" in on) deskflow_on ;; off) deskflow_off ;; sync) deskflow_sync ;; *) echo "usage: vm-display deskflow on|off|sync" >&2; exit 2 ;; esac ;;
+  status) echo "mode:   $(cat "$STATE/mode" 2>/dev/null || echo unset)"
+          echo "input:  $(lg-input status 2>/dev/null)   (lg-input auto: $(lg-input auto 2>/dev/null))"
+          echo "client: $(systemctl --user is-active -q lg-client.service && echo running || echo stopped)"
+          echo "deskflow: $(deskflow_running && echo running || echo stopped)"
+          echo -n "VM:     "; vm_running && guest_layout status 2>&1 | grep -E 'Looking|LG HDR' || echo "not running" ;;
+  *) echo "usage: vm-display lg|hdmi|toggle|status|client|deskflow on|off|sync" >&2; exit 2 ;;
+esac

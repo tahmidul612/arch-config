@@ -1,0 +1,22 @@
+#!/bin/bash
+# Record the win11 VM display (Looking Glass) + audio with host OBS (profile/collection VM-Capture, NVENC HEVC).
+# Usage: vm-rec start|stop|status   -> files land in the profile's RecFilePath (<RECORDINGS_DIR>)
+set -euo pipefail
+WS=$(dirname "$(readlink -f "$0")")/obsws.py   # install as a symlink in ~/.local/bin
+ensure_obs() {
+  if ! "$WS" '[{"requestType":"GetVersion"}]' >/dev/null 2>&1; then
+    systemd-run --user --unit=obs-vm-capture --collect obs --profile VM-Capture --collection VM-Capture \
+      --minimize-to-tray --disable-shutdown-check --disable-updater >/dev/null
+    for _ in $(seq 30); do sleep 1; "$WS" '[{"requestType":"GetVersion"}]' >/dev/null 2>&1 && return; done
+    echo "OBS did not come up" >&2; exit 1
+  fi
+}
+case "${1:-status}" in
+  start)  ensure_obs
+          # re-open the Looking Glass shared memory: OBS keeps a stale mapping after a VM restart or IVSHMEM resize
+          "$WS" '[{"requestType":"SetInputSettings","requestData":{"inputName":"VM display","inputSettings":{"shmFile":"/dev/shm/looking-glass","dmabuf":false,"hideMouse":false}}}]' >/dev/null
+          sleep 2; "$WS" '[{"requestType":"StartRecord"}]' ;;
+  stop)   "$WS" '[{"requestType":"StopRecord"}]' ;;
+  status) ensure_obs; "$WS" '[{"requestType":"GetRecordStatus"},{"requestType":"GetStats"}]' ;;
+  *) echo "usage: vm-rec start|stop|status" >&2; exit 2 ;;
+esac
