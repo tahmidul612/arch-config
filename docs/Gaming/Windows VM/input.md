@@ -53,14 +53,14 @@ mkdir -p /tmp/df && cd /tmp/df
 
 `vm-display` starts and stops the host server with the display mode: `vm-display hdmi` starts it, `vm-display lg` stops it, and `vm-display deskflow on|off|sync` does it by hand. It starts Deskflow through its desktop entry, because a bare `deskflow` command is refused by the desktop portal ("An app id is required").
 
-At login, [`vm-display-deskflow.desktop`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/looking-glass/vm-display-deskflow.desktop) runs `vm-display deskflow sync` after 8 s, and Deskflow's own autostart entry is hidden:
+At login, [`vm-display-deskflow.desktop`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/looking-glass/vm-display-deskflow.desktop) runs `vm-display deskflow sync` after 8 s:
 
 ```bash
 sed "s#<USER>#$USER#" tools/win11-vm/looking-glass/vm-display-deskflow.desktop > ~/.config/autostart/vm-display-deskflow.desktop
-cp /usr/share/applications/org.deskflow.deskflow.desktop ~/.config/autostart/
-echo Hidden=true >> ~/.config/autostart/org.deskflow.deskflow.desktop
 vm-display deskflow on && ss -ltn | grep 24800        # listening on 0.0.0.0:24800
 ```
+
+If Deskflow's own entry is in `~/.config/autostart/` (its GUI adds one when you tick "start at login"), add `Hidden=true` to it so it doesn't start the server in lg mode.
 
 Without `vm-display` (no Looking Glass), start it with `kioclient exec /usr/share/applications/org.deskflow.deskflow.desktop` and leave its autostart entry visible. KDE may ask you to allow input capture the first time the cursor crosses over.
 

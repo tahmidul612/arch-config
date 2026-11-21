@@ -154,7 +154,7 @@ What was tried and dropped, with the reason. None of these are steps to follow.
 | SPICE / VNC in virt-manager | Kept as boot console only | Reported as "very choppy" before the iGPU was passed through; the cause was not measured. |
 | SPICE with streaming off + remote-viewer, Sunshine/Moonlight inside the VM | Not tried | The iGPU passthrough came first and made them unnecessary. |
 | HDMI dummy plug, capture card | Not tried | Wanted a solution without extra hardware. The Looking Glass IDD needs neither. |
-| LG on HDMI at 3840x2160 desktop (first setup) | Superseded | Set to 1440p for recording load, then back to native 4K once recording moved to the host. |
+| 1440p desktop (2026-11-21) | Superseded | Set to cut the load of guest recording. Back to native 4K once recording moved to the host and 1440p looked soft in Looking Glass. |
 | Looking Glass B7 (stable) | Not used | No IDD, so it would still need a monitor or dummy plug on the iGPU. |
 | Looking Glass at 1440p, upscaled to the 4K panel | Superseded | Text looked softer than on HDMI. Now native 4K at 150% with 128 MiB shared memory. |
 | Mirroring the Looking Glass monitor and the HDMI output | Failed | `SDC_TOPOLOGY_CLONE` returned 31, a supplied clone config 87, `DisplaySwitch /clone` did nothing: the two are on different adapters and no path feeds the IDD from the Intel source. Replaced by the lg and hdmi modes. |

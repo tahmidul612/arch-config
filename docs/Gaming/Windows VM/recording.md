@@ -1,15 +1,15 @@
 # Recording
 
-Gameplay is recorded on the **host**: OBS reads the Looking Glass shared memory and the VM's audio sink, and encodes on the NVIDIA card. That leaves the UHD 770 free for decoding the Remote Play stream. The iGPU could not decode, drive the desktop and encode at the same time.
+Gameplay is recorded on the host: OBS reads the Looking Glass shared memory and the VM's audio sink, and encodes on the NVIDIA card. That leaves the UHD 770 free for decoding the Remote Play stream. The iGPU could not decode, drive the desktop and encode at the same time.
 
 | | Host OBS via Looking Glass (default) | Guest OBS, Quick Sync TU7 (alternative) |
 | --- | --- | --- |
 | Encoder | NVENC HEVC on the RTX 3080 | Intel Quick Sync HEVC on the UHD 770 |
-| Guest iGPU load (3D engine) | 47% at 1440p, 67% at 4K | 79% at 1440p |
-| Frames skipped in the benchmark | 1 of 7212 (1440p); 0 of 900 (4K) | 0 of 7295 (1440p) |
+| Guest iGPU load (3D engine) | 47% at 1440p; about 67% at 4K (reported by the setup session) | 79% at 1440p |
+| Frames skipped | 1 of 7212 in the 2-minute benchmark (1440p); 0 of 2714 in a 45 s run at 4K | 0 of 7295 (1440p) |
 | Status | Default. Benchmarks only; not yet used on real gameplay | Benchmark only; left installed |
 
-Benchmarks: Edge in the guest looping a 1080p60 25 Mbps test clip for 2 minutes, which is close to what Remote Play shows. "Unique frames" was checked with ffmpeg's `mpdecimate` on the result. At 4K the host recording had 899-900 of 900 unique frames per 15 s window.
+Benchmarks: Edge in the guest looping a 1080p60 25 Mbps test clip, which is close to what Remote Play shows; 2 minutes per run at 1440p. "Unique frames" was checked with ffmpeg's `mpdecimate` on the result. The shorter 4K run had 899-900 of 900 unique frames per 15 s window, with 188 frames OBS skipped for rendering (not encoding) that were not looked into.
 
 ## Host OBS (default)
 

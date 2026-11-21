@@ -16,7 +16,7 @@ Not verified yet: a Remote Play stream watched through the Looking Glass client,
 
 ## Looking Glass
 
-Looking Glass copies the guest's frames into a shared memory file, `/dev/shm/looking-glass`, and the host client draws them. This uses **B8-rc1** with its Indirect Display Driver (IDD): a virtual monitor in Windows, so the iGPU needs no monitor or HDMI dummy plug in lg mode. The stable B7 has no IDD.
+Looking Glass copies the guest's frames into a shared memory file, `/dev/shm/looking-glass`, and the host client draws them. This uses B8-rc1 with its Indirect Display Driver (IDD): a virtual monitor in Windows, so the iGPU needs no monitor or HDMI dummy plug in lg mode. The stable B7 has no IDD.
 
 The IDD renders on the passed-through Intel UHD 770 (its log says "Selected render adapter Intel(R) UHD Graphics 770").
 
@@ -54,7 +54,7 @@ The IDD renders on the passed-through Intel UHD 770 (its log says "Selected rend
     </shmem>
     ```
 
-    128 MiB is needed for 3840x2160; with 64 MiB the guest offers no 4K modes. After changing the size, empty the file before the next start so QEMU regrows it while the tmpfiles permissions stay:
+    128 MiB is needed for 3840x2160: with 64 MiB, the setup session found, the guest offers no 4K modes. After changing the size, empty the file before the next start so QEMU regrows it while the tmpfiles permissions stay (also from the setup session):
 
     ```bash
     truncate -s 0 /dev/shm/looking-glass
@@ -107,7 +107,7 @@ vm-display status
 
 ### Client keys
 
-The escape key here is Right Ctrl.
+The escape key here is Right Ctrl. Bindings as listed by the setup session; Looking Glass's own docs have the full list.
 
 | Keys | Action |
 | --- | --- |

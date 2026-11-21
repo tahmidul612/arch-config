@@ -39,21 +39,13 @@ The backups must be dumped with `--security-info`, or the restore drops the VNC 
 === "Virtual DS4"
 
     ```bash
-    pkill -f ds4gadget.py
-    virsh -c qemu:///system detach-device win11 /tmp/ds4-hostdev.xml --live
-    sudo rm /etc/udev/rules.d/70-raw-gadget.rules /etc/modules-load.d/ds4gadget.conf
+    systemctl --user disable --now ds4-vm        # detaches the DS4 and stops the gadget
+    rm -r ~/.config/systemd/user/ds4-vm.service ~/.local/lib/ds4-vm
+    sudo rm /etc/udev/rules.d/70-raw-gadget.rules /etc/modules-load.d/ds4-gadget.conf
     sudo modprobe -r raw_gadget dummy_hcd
     ```
 
-    To go back to the Xbox pad in the VM: `sudo mv /etc/udev/rules.d/99-xbox-vm-attach.rules.disabled /etc/udev/rules.d/99-xbox-vm-attach.rules` and restore `win11-before-ds4-gadget.xml`.
-
-=== "Virtual DS4 service"
-
-    ```bash
-    systemctl --user disable --now ds4-vm
-    rm -r ~/.config/systemd/user/ds4-vm.service ~/.local/lib/ds4-vm
-    sudo rm /etc/modules-load.d/ds4-gadget.conf
-    ```
+    If you ran the gadget by hand instead: `pkill -f ds4gadget.py` and `virsh -c qemu:///system detach-device win11 /tmp/ds4-hostdev.xml --live` first. To go back to the Xbox pad in the VM: `sudo mv /etc/udev/rules.d/99-xbox-vm-attach.rules.disabled /etc/udev/rules.d/99-xbox-vm-attach.rules` and restore `win11-before-ds4-gadget.xml`.
 
 === "Looking Glass and recording"
 

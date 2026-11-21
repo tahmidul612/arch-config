@@ -2,7 +2,7 @@
 
 How to move between the options on the other pages, in both directions. Each procedure says how to undo it, what it changes, what needs a restart, and how to confirm it worked.
 
-## Display: lg ↔ hdmi
+## Display: lg and hdmi
 
 One command does everything; the mode is stored in `~/.local/state/vm-display/mode` and logged to `~/.local/state/vm-display/vm-display.log`.
 
@@ -62,8 +62,8 @@ The app launcher also has "LG monitor: show the VM" (`vm-display hdmi`), "LG mon
 This LG HDR 4K (model shown by EDID as "LG HDR 4K") switches inputs cleanly only with LG's private DDC/CI command, and only the side the LG is currently showing can talk to it:
 
 - The host reaches the LG over DDC only while the LG shows DisplayPort; the VM only while it shows HDMI.
-- The standard input-select command, VCP **0x60**, half-switches it: the picture moves, but the LG's own input setting stays on the old input and it pops up "out of range" (seen 2026-11-21: "Display is showing VM, input list shows DisplayPort and out of range message popped up once").
-- LG's command, VCP **0xF4** sent from DDC source address **0x50** (0x90 = HDMI-1, 0xD0 = DP), sets the input properly. Windows' monitor API (dxva2) can only send from 0x51, so the VM sends it with Intel's IGCL raw I2C call on the passed-through iGPU.
+- The standard input-select command, VCP 0x60, half-switches it: the picture moves, but the LG's own input setting stays on the old input and it pops up "out of range" (seen 2026-11-21: "Display is showing VM, input list shows DisplayPort and out of range message popped up once").
+- LG's command, VCP 0xF4 sent from DDC source address 0x50 (0x90 = HDMI-1, 0xD0 = DP), sets the input properly. Windows' monitor API (dxva2) can only send from 0x51, so the VM sends it with Intel's IGCL raw I2C call on the passed-through iGPU.
 - From the host, 0xF4 is ignored nearly every time (it worked once, then never again); why is unknown.
 
 So the working method is a hand-off:
@@ -118,7 +118,7 @@ The VM's HDMI output must be active (layout `hdmi` or `extended`) for any of thi
 
 Not exercised yet: the shutdown hook, `rescue`, the watcher reacting to a manual joystick switch, and the shortcuts after logging in again.
 
-## Recording: host ↔ guest OBS
+## Recording: host or guest OBS
 
 === "Guest → host (current)"
 
@@ -134,9 +134,11 @@ Not exercised yet: the shutdown hook, `rescue`, the watcher reacting to a manual
     2. In the guest, set the "Recording" profile to QSV HEVC target usage 7 (the profile's state is unknown, [see](recording.md#guest-obs-alternative)) and start `OBSRec`.
     3. Confirm on a 2-minute test that skipped frames stay at 0 and the 3D engine stays below ~80% in Task Manager.
 
+    Not exercised: this direction has not been done since recording moved to the host. Undo: the steps in the other tab.
+
 ## Deskflow
 
-Follows the display mode by itself: `vm-display lg` stops the host server, `vm-display hdmi` starts it. At login, `~/.config/autostart/vm-display-deskflow.desktop` runs `vm-display deskflow sync`, and Deskflow's own autostart entry is hidden (`Hidden=true`). By hand: `vm-display deskflow on|off|sync`. See [Input](input.md#start-and-stop).
+Follows the display mode by itself: `vm-display lg` stops the host server, `vm-display hdmi` starts it. At login, `~/.config/autostart/vm-display-deskflow.desktop` runs `vm-display deskflow sync`; Deskflow's own autostart entry, if any, is hidden (`Hidden=true`). By hand: `vm-display deskflow on|off|sync`. See [Input](input.md#start-and-stop).
 
 ## Controller
 

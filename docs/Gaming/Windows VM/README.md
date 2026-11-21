@@ -29,6 +29,8 @@ There are two ways to see the VM: a Looking Glass window on the host (the defaul
 
 ## Status
 
+Active right now (2026-11-21, evening): lg mode with the guest at 3840x2160 and 150% scaling, `ds4-vm.service` enabled, Deskflow stopped (it runs only in hdmi mode), host OBS profile VM-Capture ready.
+
 As of 2026-11-21. "Confirmed" means it was used in a real session; "tested" means it was checked by commands or a benchmark only.
 
 | Part | Choice | Status |
