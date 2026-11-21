@@ -39,7 +39,7 @@ Generates the static site in the `site/` directory.
 - `pyproject.toml` / `uv.lock` - Python dependencies, managed by uv
 - `mkdocs.yml` - Main configuration file for MkDocs site settings, theme configuration, and plugins
 - `docs/` - Contains all documentation markdown files
-  - `index.md` - Home page
+  - `README.md` - Home page
   - `CachyOS/` - CachyOS-specific documentation
   - `assets/` - Images and icons (arch-linux.svg, cog-custom.png)
   - `stylesheets/extra.css` - Custom CSS overrides
@@ -62,3 +62,4 @@ When adding new documentation:
 3. Use admonitions for tips, warnings, and notes
 4. Code blocks support syntax highlighting and copy buttons
 5. Tabbed content can be created using pymdownx.tabbed extension
+6. Each docs folder's landing page is `README.md`; never have both `README.md` and `index.md` in one folder
