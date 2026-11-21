@@ -12,6 +12,7 @@ Every change can be undone on its own. Take an XML backup before each step ([VM 
 | `win11-before-pipewire-audio.xml` | PipeWire audio | SPICE audio |
 | `win11-before-ds4-gadget.xml` | removing the Xbox hostdev | Xbox pad passed to the VM |
 | `win11-before-looking-glass.xml` | shmem and `memballoon none` | no Looking Glass device |
+| `win11-before-lg-128m.xml` | shmem 64 → 128 MiB | 1440p Looking Glass |
 
 Restore one with:
 
@@ -46,6 +47,36 @@ The backups must be dumped with `--security-info`, or the restore drops the VNC 
 
     To go back to the Xbox pad in the VM: `sudo mv /etc/udev/rules.d/99-xbox-vm-attach.rules.disabled /etc/udev/rules.d/99-xbox-vm-attach.rules` and restore `win11-before-ds4-gadget.xml`.
 
+=== "Virtual DS4 service"
+
+    ```bash
+    systemctl --user disable --now ds4-vm
+    rm -r ~/.config/systemd/user/ds4-vm.service ~/.local/lib/ds4-vm
+    sudo rm /etc/modules-load.d/ds4-gadget.conf
+    ```
+
+=== "Looking Glass and recording"
+
+    ```bash
+    systemctl --user stop lg-client obs-vm-capture 2>/dev/null
+    rm ~/.local/bin/vm-display ~/.local/bin/vm-rec ~/.config/looking-glass/client.ini
+    rm -r ~/.config/obs-studio/basic/profiles/VM-Capture ~/.config/obs-studio/basic/scenes/VM-Capture.json
+    paru -Rns looking-glass-rc obs-plugin-looking-glass-rc
+    sudo rm /etc/tmpfiles.d/10-looking-glass.conf /dev/shm/looking-glass
+    ```
+
+    Then restore `win11-before-looking-glass.xml`, and in the guest uninstall "Looking Glass (IDD)" and remove the HostFission certificate from `Cert:\LocalMachine\TrustedPublisher`. Without the IDD, hdmi mode (the LG on the iGPU's HDMI) is the only display.
+
+=== "LG input switching"
+
+    ```bash
+    systemctl --user disable --now lg-input-watch      # its stop hook gives DP-1 back to the host
+    rm ~/.local/bin/lg-input ~/.config/systemd/user/lg-input-watch.service ~/.local/share/applications/net.local.lg-input-*.desktop
+    rm -r ~/.local/state/lg-input
+    ```
+
+    Remove the two shortcuts in System Settings > Shortcuts. In the guest: `Unregister-ScheduledTask LgInput-Toggle,LgInput-OnShutdown -Confirm:$false`, delete `C:\Tools\monitor` and the "Switch LG monitor (host - VM)" desktop shortcut.
+
 === "Audio"
 
     ```bash
@@ -60,7 +91,7 @@ The backups must be dumped with `--security-info`, or the restore drops the VNC 
 
     ```bash
     sudo ufw delete allow in on virbr0 from 192.168.122.0/24 to any port 24800 proto tcp
-    rm ~/.config/autostart/org.deskflow.deskflow.desktop
+    rm ~/.config/autostart/org.deskflow.deskflow.desktop ~/.config/autostart/vm-display-deskflow.desktop
     sudo pacman -Rns deskflow
     rm -r ~/.config/Deskflow
     ```
@@ -85,6 +116,13 @@ Run as administrator in the guest (or through `guest-ps.py`).
     $g = (Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\* | ? DisplayName -match 'Deskflow').PSChildName
     Start-Process msiexec -ArgumentList "/x $g /qn /norestart" -Wait
     Remove-Item -Recurse C:\ProgramData\Deskflow
+    ```
+
+=== "Display tasks"
+
+    ```powershell
+    Get-ScheduledTask Display-* | Unregister-ScheduledTask -Confirm:$false
+    Remove-Item -Recurse C:\Tools\display
     ```
 
 === "Idle shutdown"

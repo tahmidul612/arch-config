@@ -8,7 +8,7 @@ Two separate things: the host's keyboard and mouse reaching Windows (Deskflow), 
 
 It was picked after comparing the open-source options (2026-11-21): Deskflow 1.27 (active, GPL-2.0, official Windows MSI and an Arch package), Lan Mouse 0.11 (younger, weak clipboard; the fallback if Deskflow misbehaves on Wayland, never tried), Input Leap (archived) and Barrier (dead, X11 only).
 
-Status: **working** with the monitor on the iGPU's HDMI port. Confirmed in real use (2026-11-21): mouse crossing, keyboard and clipboard. With the Looking Glass window as the display, the Looking Glass client passes keyboard and mouse itself, and whether Deskflow is still needed there is undecided.
+Status: **working** with the monitor on the iGPU's HDMI port. Confirmed in real use (2026-11-21): mouse crossing, keyboard and clipboard. It is only needed in [hdmi mode](display.md#lg-on-hdmi): in lg mode the Looking Glass client passes keyboard and mouse, so `vm-display` runs the host server only in hdmi mode ([Start and stop](#start-and-stop)). Deskflow switched by `vm-display` has not been used in a real hdmi-mode session yet.
 
 ### 1. Certificates
 
@@ -49,17 +49,20 @@ mkdir -p /tmp/df && cd /tmp/df
     !!! danger "Don't load `/etc/nftables.conf`"
         `nftables.service` is inactive on this machine. Adding the rule to `/etc/nftables.conf` and running `nft -f` loaded a second filter table with a drop policy next to UFW's tables, which blocks other inbound traffic until it is deleted (`sudo nft delete table inet filter`).
 
-=== "Start"
+### Start and stop
 
-    Start Deskflow through its desktop entry, not as a bare command; otherwise the desktop portal refuses it with "An app id is required".
+`vm-display` starts and stops the host server with the display mode: `vm-display hdmi` starts it, `vm-display lg` stops it, and `vm-display deskflow on|off|sync` does it by hand. It starts Deskflow through its desktop entry, because a bare `deskflow` command is refused by the desktop portal ("An app id is required").
 
-    ```bash
-    kioclient exec /usr/share/applications/org.deskflow.deskflow.desktop
-    cp /usr/share/applications/org.deskflow.deskflow.desktop ~/.config/autostart/
-    ss -ltn | grep 24800        # listening on 0.0.0.0:24800
-    ```
+At login, [`vm-display-deskflow.desktop`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/looking-glass/vm-display-deskflow.desktop) runs `vm-display deskflow sync` after 8 s, and Deskflow's own autostart entry is hidden:
 
-    KDE may ask you to allow input capture the first time the cursor crosses over.
+```bash
+sed "s#<USER>#$USER#" tools/win11-vm/looking-glass/vm-display-deskflow.desktop > ~/.config/autostart/vm-display-deskflow.desktop
+cp /usr/share/applications/org.deskflow.deskflow.desktop ~/.config/autostart/
+echo Hidden=true >> ~/.config/autostart/org.deskflow.deskflow.desktop
+vm-display deskflow on && ss -ltn | grep 24800        # listening on 0.0.0.0:24800
+```
+
+Without `vm-display` (no Looking Glass), start it with `kioclient exec /usr/share/applications/org.deskflow.deskflow.desktop` and leave its autostart entry visible. KDE may ask you to allow input capture the first time the cursor crosses over.
 
 ### 3. Guest (client)
 
@@ -104,7 +107,7 @@ Remote Play only accepts Sony controllers. The Xbox controller stays on the host
 
 The descriptors and feature reports come from [ViGEmBus](https://github.com/nefarius/ViGEmBus)' `Ds4Pdo.cpp`. The script answers the control requests Remote Play sends at connect (feature reports `0x12`, `0xa3`, `0x02`, and the `0x14` set report), maps the Xbox pad's buttons and sticks from evdev, and logs every request; unknown ones are stalled and logged as `UNHANDLED`. The Xbox Guide button is the PS button.
 
-Status: **working**. Verdict after real use (2026-11-21): "the host side ds4 worked, i was playing the game using it for 6+ hours." There is no service yet; start it by hand as below.
+Status: **working**. Verdict after real use (2026-11-21, started by hand): "the host side ds4 worked, i was playing the game using it for 6+ hours." Since then a user service runs it automatically, only while Remote Play is open; see below for what has been tested of that.
 
 !!! note "Why not ViGEmBus in the guest"
     The obvious route is an Xbox pad in the VM plus ViGEmBus and a DS4 emulator. Remote Play ignores ViGEm's virtual DS4 (since v6 it sends control requests ViGEm doesn't answer), and Remote Play 9.x crashes on purpose when ViGEmBus is installed. See [Troubleshooting](troubleshooting.md#what-was-tried).
@@ -113,22 +116,39 @@ Status: **working**. Verdict after real use (2026-11-21): "the host side ds4 wor
 
 ```bash
 cd tools/win11-vm
-sudo ./ds4-host-prep.sh
+sudo ./ds4-host-prep.sh          # udev rule for /dev/raw-gadget, loads the modules now
+./ds4-modules-setup.sh           # asks for sudo; loads dummy_hcd + raw_gadget at every boot
 ```
 
-[`ds4-host-prep.sh`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-host-prep.sh) disables the old Xbox auto-attach udev rule if present (the pad must stay on the host), writes `/etc/udev/rules.d/70-raw-gadget.rules` so you own `/dev/raw-gadget`, and loads `dummy_hcd` and `raw_gadget`. It needs `python-evdev`, and your user must be able to read the pad's `/dev/input/event*` (here: member of `input`).
+[`ds4-host-prep.sh`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-host-prep.sh) disables the old Xbox auto-attach udev rule if present (the pad must stay on the host), writes `/etc/udev/rules.d/70-raw-gadget.rules` so you own `/dev/raw-gadget`, and loads `dummy_hcd` and `raw_gadget`. [`ds4-modules-setup.sh`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-modules-setup.sh) writes `/etc/modules-load.d/ds4-gadget.conf`. The gadget needs `python-evdev`, and your user must be able to read the pad's `/dev/input/event*` (here: member of `input`).
 
-The modules are not loaded at boot. Either rerun the script after a reboot, or persist them:
+### The service: DS4 while Remote Play runs
+
+[`ds4-vm.py`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-vm.py), run by the user unit [`ds4-vm.service`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-vm.service), asks the guest agent every 3 s whether `RemotePlay.exe` is running (`tasklist`):
+
+- Remote Play running: it starts `ds4gadget.py` (restarted with back-off if it dies) and keeps exactly the current DS4 attached to the VM as a live USB hostdev. Stale entries from an earlier enumeration are detached, and it attaches again after a VM restart.
+- Remote Play closed for 15 s, or the VM stopped: it detaches the DS4 and stops the gadget. Other games and apps never see a DS4; the Xbox pad stays with the host.
+- Guest agent not answering (booting, busy): it keeps the current state.
+
+Unplugging the Xbox pad is handled inside `ds4gadget.py`: it sends neutral input while the pad is gone and picks it up again when it is back, so Windows never sees the DS4 disappear.
 
 ```bash
-printf 'dummy_hcd\nraw_gadget\n' | sudo tee /etc/modules-load.d/ds4gadget.conf
+mkdir -p ~/.local/lib/ds4-vm
+cp tools/win11-vm/{ds4-vm.py,ds4gadget.py,ds4_report_desc.bin} ~/.local/lib/ds4-vm/
+cp tools/win11-vm/ds4-vm.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now ds4-vm
+journalctl --user -u ds4-vm -f
 ```
 
-(Not done on this machine yet.)
+Check: start Remote Play in the VM. Within a few seconds the journal shows the attach, then Remote Play's queries (`GET_REPORT feature 0x12`, `0xa3`, `0x02`) and a light-bar colour. Windows Device Manager shows "HID-compliant game controller" for `VID_054C&PID_05C4`. On the PS5, press PS and pick the user at "Who's using this controller?". Close Remote Play: after 15 s the journal says "Remote Play closed: stopping the virtual DS4".
 
-### Each session: start and attach
+Tested by the setup session, not yet in your own play: start and attach, Remote Play recognising it, detach when Remote Play closes, recovery when the hostdev is detached behind its back, and an emulator restart. Not tested: unplugging the Xbox pad during a session, a VM stop and start, and the first host reboot with the modules file.
 
-Plug in the Xbox controller, then:
+`systemctl --user stop ds4-vm` stops it. `ds4gadget.py -v` logs every button press.
+
+### Manual fallback
+
+Without the service, or to debug, with the Xbox pad plugged in. Stop the service first (`systemctl --user stop ds4-vm`) so the two don't fight over `/dev/raw-gadget`.
 
 ```bash
 cd tools/win11-vm
@@ -143,20 +163,9 @@ EOF
 virsh -c qemu:///system attach-device win11 /tmp/ds4-hostdev.xml --live
 ```
 
-Check: Windows Device Manager shows "HID-compliant game controller" for `VID_054C&PID_05C4`, and when Remote Play connects the log shows `GET_REPORT 0x12`, `0xa3`, `0x02`, then `SET_REPORT 0x14` and a light-bar colour. On the PS5, press PS and pick the user at "Who's using this controller?".
+The attach is `--live` only: after a VM restart or a gadget restart, run `detach-device` and `attach-device` again with the same file. `--no-pad` enumerates the DS4 without reading a controller, to test the USB side alone.
 
-The attach is `--live` only. After the VM restarts, or if the gadget restarts and re-enumerates, detach and attach again:
-
-```bash
-virsh -c qemu:///system detach-device win11 /tmp/ds4-hostdev.xml --live
-virsh -c qemu:///system attach-device win11 /tmp/ds4-hostdev.xml --live
-```
-
-Stop: kill `ds4gadget.py`, then detach as above.
-
-`--no-pad` enumerates the DS4 without reading a controller, which is useful to test the USB side alone.
-
-Known gaps: no systemd unit or VM start hook; rumble from the game is logged but not forwarded to the Xbox pad. Once the Xbox pad dropped off the host for a few seconds (`[Errno 19] No such device`); the script waited and picked it up again.
+Known gap: rumble from the game is logged but not forwarded to the Xbox pad.
 
 ### Old: Xbox controller passed to the VM
 
@@ -174,6 +183,9 @@ sudo systemctl daemon-reload
 | `tools/win11-vm/deskflow/Deskflow.host.conf`, `deskflow-server.conf` | `~/.config/Deskflow/` | Host server settings and layout |
 | `tools/win11-vm/deskflow/Deskflow.guest.conf` | guest `C:\ProgramData\Deskflow\Deskflow.conf` | Guest client settings |
 | `tools/win11-vm/deskflow/make-certs.sh` | writes `host/` and `guest/` TLS files | Pinned certificates |
-| `tools/win11-vm/ds4-host-prep.sh` | `/etc/udev/rules.d/70-raw-gadget.rules` | Modules and `/dev/raw-gadget` access |
-| `tools/win11-vm/ds4gadget.py`, `ds4_report_desc.bin` | run in place | The virtual DS4 |
+| `tools/win11-vm/ds4-host-prep.sh` | `/etc/udev/rules.d/70-raw-gadget.rules` | `/dev/raw-gadget` access, modules now |
+| `tools/win11-vm/ds4-modules-setup.sh` | `/etc/modules-load.d/ds4-gadget.conf` | Modules at boot |
+| `tools/win11-vm/ds4-vm.py`, `ds4gadget.py`, `ds4_report_desc.bin` | `~/.local/lib/ds4-vm/` | Supervisor and the virtual DS4 |
+| `tools/win11-vm/ds4-vm.service` | `~/.config/systemd/user/` | Runs the supervisor |
+| `tools/win11-vm/looking-glass/vm-display-deskflow.desktop` | `~/.config/autostart/` | Deskflow follows the display mode at login |
 | `tools/win11-vm/xbox-vm-attach*`, `99-xbox-vm-attach.rules` | `/usr/local/bin/`, `/etc/systemd/system/`, `/etc/udev/rules.d/` | Superseded Xbox hot-plug attach |

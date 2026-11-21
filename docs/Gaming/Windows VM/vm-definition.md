@@ -44,7 +44,7 @@ Do this only for a new VM. For an existing one, apply the sections below to its 
 - 8 vCPU in one socket (4 cores, 2 threads). The original 4 vCPU showed up as 4 one-core sockets. Windows client editions use at most 2 sockets, so one socket is the safe layout.
 - Pinning: on the i7-12700K, host CPUs 0-15 are the 8 P-cores with their hyperthreads and 16-19 are E-cores. The vCPUs get 4 P-cores (8-15) and the QEMU emulator threads get E-cores (16-19). That is the reasoning; nobody measured whether pinning made a difference.
 - `maxphysaddr limit='39'` is the IOMMU width from [Host preparation](host-prep.md#4-read-the-iommu-address-width).
-- Memory stays at 8 GiB. `memballoon` is `none` (a Looking Glass requirement).
+- Memory stays at 8 GiB. `memballoon` is `none` (a [Looking Glass](display.md#looking-glass) requirement).
 
 Check from the host after a start:
 
@@ -141,11 +141,11 @@ The SPICE audio backend was replaced by QEMU's PipeWire backend. The XML is belo
 <memballoon model='none'/>
 <shmem name='looking-glass'>
   <model type='ivshmem-plain'/>
-  <size unit='M'>64</size>
+  <size unit='M'>128</size>
 </shmem>
 ```
 
-The size depends on the guest's desktop resolution: 64 MiB fits 2560x1440, and a 3840x2160 desktop needs 128 MiB. The host file `/dev/shm/looking-glass` and the guest side are part of the Looking Glass display setup.
+The size depends on the guest's desktop resolution: 64 MiB fits 2560x1440, and the native 3840x2160 desktop needs 128 MiB. After a size change, run `truncate -s 0 /dev/shm/looking-glass` before the next start. The host file and the guest side are on [Display](display.md#looking-glass).
 
 ## Restarting so changes apply
 

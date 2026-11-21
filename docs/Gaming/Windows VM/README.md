@@ -37,22 +37,29 @@ As of 2026-11-21. "Confirmed" means it was used in a real session; "tested" mean
 | CPU | 8 vCPU, one socket, pinned to P-cores 8-15, emulator on E-cores 16-19 | In use; benefit not measured |
 | Network | libvirt NAT `default` | Confirmed |
 | iGPU | VFIO, UPT mode, `Universal_noGOP_igd.rom`, Intel driver 32.0.101.7088 | Confirmed |
-| Controller | Virtual DS4 from the Xbox pad (`ds4gadget.py`), started by hand | Confirmed (6+ hours of play) |
-| Keyboard and mouse | Deskflow 1.27, TLS pinned, UFW rule on `virbr0` | Confirmed on the HDMI monitor (mouse, keyboard, clipboard); role with Looking Glass undecided |
-| Audio | QEMU PipeWire backend, `win11_vm` loopback sink | Backend confirmed ("works and in sync"); the loopback sink was added later and is tested only |
+| Display | lg mode: Looking Glass at native 4K on the LG over DP (default); hdmi mode: Windows on the LG's HDMI input; switched with `vm-display` | Both modes and the switching confirmed clean; Remote Play through Looking Glass not yet |
+| Recording | Host OBS from Looking Glass, NVENC HEVC, 4K canvas to 1080p60 (`vm-rec`) | Benchmarks only |
+| Controller | Virtual DS4 from the Xbox pad (`ds4gadget.py`), run by `ds4-vm.service` only while Remote Play is open | Gadget confirmed (6+ hours, started by hand); the service tested only |
+| Keyboard and mouse | lg mode: the Looking Glass client. hdmi mode: Deskflow 1.27, TLS pinned, UFW rule on `virbr0`, started by `vm-display` | Deskflow confirmed on the HDMI monitor (mouse, keyboard, clipboard) |
+| Audio | QEMU PipeWire backend, `win11_vm` loopback sink | Backend confirmed ("works and in sync"); the sink tested, including a VM restart |
 | Idle shutdown | `IdleShutdown` task: 60 min without input and without a stream | Running; not yet observed over days |
 | Old: Xbox pad in the VM + ViGEmBus | | Failed; Remote Play ignores it |
 | Old: Remote Play 9.5 | | Failed; crashes in this VM |
+| Old: guest OBS on Quick Sync | | Failed at the settings used in play; kept as a benchmarked alternative |
+| Old: mirroring Looking Glass and HDMI | | Failed; Windows can't clone across the two adapters |
 
 ## Reading order
 
 1. [Host preparation](host-prep.md): IOMMU, the iGPU to vfio-pci, the address width
 2. [VM definition](vm-definition.md): every change to the libvirt XML
 3. [Windows guest](windows-guest.md): guest agent helpers, Intel driver, Remote Play, idle shutdown
-4. [Input](input.md): Deskflow and the virtual DualShock 4
-5. [Audio](audio.md): PipeWire backend and the loopback sink
-6. [Troubleshooting](troubleshooting.md): symptoms, everything that was tried, open items
-7. [Rollback](rollback.md): undo any step
+4. [Display](display.md): Looking Glass (lg mode) and the LG on HDMI (hdmi mode)
+5. [Input](input.md): Deskflow and the virtual DualShock 4
+6. [Audio](audio.md): PipeWire backend and the loopback sink
+7. [Recording](recording.md): host OBS through Looking Glass, guest OBS as the alternative
+8. [Switching](switching.md): lg ↔ hdmi, LG input switching, host ↔ guest recording
+9. [Troubleshooting](troubleshooting.md): symptoms, everything that was tried, open items
+10. [Rollback](rollback.md): undo any step
 
 The helper files are in [`tools/win11-vm/`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/README.md).
 
@@ -60,8 +67,11 @@ The helper files are in [`tools/win11-vm/`](https://github.com/tahmidul612/arch-
 
 ```bash
 virsh -c qemu:///system start win11
-cd tools/win11-vm && python3 ds4gadget.py --log /tmp/ds4gadget.log &   # with the Xbox pad plugged in
-virsh -c qemu:///system attach-device win11 /tmp/ds4-hostdev.xml --live   # see Input
-# play; the VM shuts itself down after an hour idle, or:
+vm-display lg            # Looking Glass client full screen on the LG (or: vm-display hdmi)
+# start Remote Play in the VM: ds4-vm.service attaches the virtual DS4 by itself
+vm-rec start             # optional: record; vm-rec stop when done
+# the VM shuts itself down after an hour idle, or:
 virsh -c qemu:///system shutdown win11 --mode agent
 ```
+
+Keyboard shortcuts: ++meta+ctrl+f11++ on the host or ++ctrl+alt+f11++ in the VM toggles between lg and hdmi mode; tap ++right-ctrl++ to capture or release input in the Looking Glass client.
