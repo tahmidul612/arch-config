@@ -106,7 +106,10 @@ resmon push week             # fire a review now
 
 Limitations: 30 s sampling smooths short spikes (PSI partially covers this),
 the Intel iGPU isn't tracked, and PSS for other users' processes falls back
-to RSS.
+to RSS. PSS itself is read every 10th sample per process (reading it makes the
+kernel walk page tables, most of the collector's cost); in between, memory is
+RSS times that process's last PSS/RSS ratio. Totals stayed within 0.3% of
+per-sample PSS in a side-by-side run.
 
 ## Development
 
