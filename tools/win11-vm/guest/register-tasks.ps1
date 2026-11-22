@@ -16,6 +16,12 @@ foreach ($l in 'lgonly','hdmi','extended','status') {
   $a = New-ScheduledTaskAction -Execute $ps -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"& C:\Tools\display\display-layout.ps1 -Layout $l *> C:\Tools\display\last-$l.out`""
   Register-ScheduledTask -TaskName "Display-$l" -Action $a -Principal $userPrincipal -Settings (Settings) -Force | Out-Null
 }
+# Looking Glass-only at native 4K (the launcher's "4K native" picture; vm-display registers it on first use too)
+$a = New-ScheduledTaskAction -Execute $ps -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"& C:\Tools\display\display-layout.ps1 -Layout lgonly -Width 3840 -Height 2160 -Scale 150 *> C:\Tools\display\last-lgonly4k.out`""
+Register-ScheduledTask -TaskName 'Display-lgonly4k' -Action $a -Principal $userPrincipal -Settings (Settings) -Force | Out-Null
+# PS Remote Play in the logged-in session (the launcher's "Open PS Remote Play"; also registered on first use)
+$a = New-ScheduledTaskAction -Execute 'C:\Program Files (x86)\Sony\PS Remote Play\RemotePlay.exe'
+Register-ScheduledTask -TaskName 'App-RemotePlay' -Action $a -Principal $userPrincipal -Settings (Settings) -Force | Out-Null
 # Back to the Looking Glass-only layout 15 s after each login
 $a = New-ScheduledTaskAction -Execute $ps -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"& C:\Tools\display\display-layout.ps1 -Layout lgonly *> C:\Tools\display\last-logon.out`""
 $t = New-ScheduledTaskTrigger -AtLogOn -User $User; $t.Delay = 'PT15S'
@@ -37,4 +43,4 @@ Register-ScheduledTask -TaskName 'LgInput-OnShutdown' -Action $a -Trigger $t -Pr
 $s = (New-Object -ComObject WScript.Shell).CreateShortcut('C:\Users\Public\Desktop\Switch LG monitor (host - VM).lnk')
 $s.TargetPath = 'C:\Windows\System32\schtasks.exe'; $s.Arguments = '/run /tn LgInput-Toggle'; $s.Hotkey = 'Ctrl+Alt+F11'; $s.Save()
 
-Get-ScheduledTask | ? { $_.TaskName -match '^(Display-|LgInput-)' } | Select TaskName, State | Format-Table -AutoSize
+Get-ScheduledTask | ? { $_.TaskName -match '^(Display-|LgInput-|App-)' } | Select TaskName, State | Format-Table -AutoSize

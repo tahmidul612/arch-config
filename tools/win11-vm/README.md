@@ -29,14 +29,16 @@ Nothing here contains secrets. Where a file needs a user, host or path from your
 | `looking-glass/lg-host-setup.sh` | AUR packages, `/etc/tmpfiles.d/10-looking-glass.conf` | `./lg-host-setup.sh` as your user | Default |
 | `looking-glass/10-looking-glass.conf` | `/etc/tmpfiles.d/` (written by the script) | reference | Default |
 | `looking-glass/client.ini` | `~/.config/looking-glass/` | copy (FSR 1 upscaling on) | Default |
-| `looking-glass/vm-display`, `looking-glass/lg-client-to-output.js` | symlink `vm-display` into `~/.local/bin/` | `vm-display lg\|hdmi\|toggle\|status\|client\|deskflow` | Default |
+| `looking-glass/vm-display`, `looking-glass/lg-client-to-output.js` | symlink `vm-display` into `~/.local/bin/` (`launcher/install.sh` does it) | `vm-display lg [fsr\|native]\|hdmi [--no-switch]\|host\|toggle\|status\|client\|launch\|shutdown\|deskflow` | Default; `launch`, `host`, the native picture and `--no-switch` added 2026-11-22 (launch tested live in lg mode, fsr and native; hdmi only as a dry run) |
+| `launcher/` | `~/.local/bin/vm-launch`, icons in `~/.local/share/icons/hicolor/`, `vm-launch.desktop` | `launcher/install.sh`, see its README | Default (tested live in lg mode; hdmi mode only as a dry run) |
 | `looking-glass/vm-display-deskflow.desktop` | `~/.config/autostart/` (fill in `<USER>`) | | Default |
 | `looking-glass/vm-rec`, `looking-glass/obsws.py` | symlink `vm-rec` into `~/.local/bin/` (needs `python-websockets`) | `vm-rec start\|stop\|status` | Default (benchmarks only) |
 | `looking-glass/obs/basic.ini`, `recordEncoder.json`, `VM-Capture.json` | `~/.config/obs-studio/basic/profiles/VM-Capture/`, `.../scenes/` (fill in `<RECORDINGS_DIR>`) | | Default |
 | `monitor-input/lg-input`, `lg-input-watch.service` | `~/.local/bin/`, `~/.config/systemd/user/` | `systemctl --user enable --now lg-input-watch` | Default |
 | `monitor-input/net.local.lg-input-*.desktop`, `register-shortcuts.py` | `~/.local/share/applications/` (fill in `<USER>`); shortcuts via kglobalaccel | `python3 register-shortcuts.py` once | Default |
-| `guest/display-layout.ps1` | guest `C:\Tools\display\` | tasks `Display-*`; `lgonly` defaults to 1920x1080 @100%, `hdmi`/`extended` to 3840x2160 @150% | Default |
+| `guest/display-layout.ps1` | guest `C:\Tools\display\` | tasks `Display-*` (plus `Display-lgonly4k` for the native 4K picture); `lgonly` defaults to 1920x1080 @100%, `hdmi`/`extended` to 3840x2160 @150% | Default |
 | `guest/lg-igcl.ps1`, `guest/lg-vm-toggle.ps1` | guest `C:\Tools\monitor\` | tasks `LgInput-*` | Default |
+| `guest/no-gamebar-popup.ps1` | guest `C:\Tools\controller\` | run once through `guest-ps.py` (`-Undo` reverses it) | Default (2026-11-22: `ms-gamebar://` opened the Open-With dialog before, nothing after) |
 | `guest/register-tasks.ps1` | run once in the guest, elevated | `register-tasks.ps1 -User <WINDOWS_USER>` | Written for the docs, not run (the tasks it creates were) |
 | `xbox-vm-attach`, `xbox-vm-attach@.service`, `99-xbox-vm-attach.rules`, `xbox-vm-attach-install.sh` | `/usr/local/bin/`, `/etc/systemd/system/`, `/etc/udev/rules.d/` | `sudo ./xbox-vm-attach-install.sh` | Superseded: worked, but Remote Play ignores an Xbox pad; `ds4-host-prep.sh` disables the rule |
 

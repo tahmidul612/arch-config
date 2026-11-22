@@ -1,16 +1,32 @@
 #!/bin/bash
 # vm-display: choose how the LG HDR 4K shows the win11 VM.
-#   vm-display lg      (default) VM = Looking Glass monitor only; the LG stays on DP (host DP-1) and shows the
+#   vm-display lg [fsr|native]
+#                      (default) VM = Looking Glass monitor only; the LG stays on DP (host DP-1) and shows the
 #                      VM through looking-glass-client fullscreen on DP-1. Host OBS (vm-rec) records the same picture.
-#   vm-display hdmi    VM = LG on the iGPU HDMI as primary + Looking Glass extended; the LG input is switched to
+#                      Picture profile (remembered in ~/.local/state/vm-display/picture, default fsr):
+#                        fsr     Windows at 1920x1080 @100%, the client upscales it with FSR 1 (client.ini)
+#                        native  Windows at 3840x2160 @150% (guest task Display-lgonly4k, registered on first use),
+#                                client started with every filter off, so the LG gets the guest's pixels 1:1
+#   vm-display hdmi [--no-switch]
+#                      VM = LG on the iGPU HDMI as primary + Looking Glass extended; the LG input is switched to
 #                      HDMI-1 (lg-input), and lg-input's watcher turns host DP-1 off while the LG shows the VM.
+#                      --no-switch: set Windows up for HDMI but leave the LG on the host; switch it later with the
+#                      LG's joystick (the watcher then turns DP-1 off). Meta+Ctrl+F11 would go back to lg mode.
 #                      Note: vm-rec then records the Looking Glass monitor, i.e. the *secondary* screen.
+#   vm-display host    LG back on the host desktop: lg mode, LG on DP, Looking Glass client closed, VM keeps running
+#                      ('vm-display client' brings the picture back)
 #   vm-display toggle  lg <-> hdmi (what the LG-input shortcuts and the VM's Ctrl+Alt+F11 do, via lg-input)
 #   vm-display status  show the mode, LG input, VM layout and client state
-#   vm-display client  (re)start the Looking Glass client on DP-1 only
+#   vm-display client  (re)start the Looking Glass client on DP-1 only (with the current picture profile)
 #   vm-display deskflow on|off|sync   Deskflow server (keyboard/mouse into the VM off DP-2's left edge):
 #                      only needed in hdmi mode (in lg mode the Looking Glass client passes input itself).
 #                      lg stops it, hdmi starts it; 'sync' (run at login by the autostart entry) follows the mode.
+#   vm-display launch [--display lg|hdmi] [--picture fsr|native] [--no-switch] [--remote-play]
+#                     [--ds4 on|off|keep] [--record] [--dry-run]
+#                      start the VM if needed, wait for Windows' login, then set up the display path and the extras.
+#                      Prints one '@step <id> <run|ok|skip|fail> [detail]' line per step and '@done ok|fail' at the
+#                      end (read by the vm-launch GUI). --dry-run prints the same steps without touching anything.
+#   vm-display shutdown  stop a recording, then shut Windows down (its LgInput-OnShutdown task hands the LG back)
 # Mode is stored in ~/.local/state/vm-display/mode. Failsafe: a failed switch to hdmi falls back to lg.
 set -uo pipefail
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/vm-display; mkdir -p "$STATE"
@@ -18,14 +34,41 @@ HERE=$(dirname "$(readlink -f "$0")")     # install as a symlink: ln -s <repo>/t
 VM=${VM:-win11}
 GUEST=$HERE/../guest-ps.py
 KWIN_JS=$HERE/lg-client-to-output.js
+VM_REC=$HERE/vm-rec
 LG_OUT=DP-1
+RP_EXE='C:\Program Files (x86)\Sony\PS Remote Play\RemotePlay.exe'
+LAUNCH=        # set by 'launch': step lines go to stdout
 log(){ echo "$(date +%T) $*" | tee -a "$STATE/vm-display.log" >&2; }
-notify(){ notify-send -a "VM display" -i video-display "VM display" "$1" 2>/dev/null || true; }
+step(){ [ -n "$LAUNCH" ] && echo "@step $*"; return 0; }
+notify(){ [ -n "$LAUNCH" ] && return 0; notify-send -a "VM display" -i video-display "VM display" "$1" 2>/dev/null || true; }
 vm_running(){ [ "$(virsh -c qemu:///system domstate "$VM" 2>/dev/null)" = "running" ]; }
-guest_layout(){  # $1 = lgonly | hdmi | extended | status
-  vm_running || { log "VM not running: skipping guest layout $1"; return 3; }
+picture(){ local p; p=$(cat "$STATE/picture" 2>/dev/null); [ "$p" = native ] && echo native || echo fsr; }
+gps(){ "$GUEST" "$@" 2>&1 | tr -d '\r'; }   # PowerShell from stdin, run in the guest (as SYSTEM)
+
+# Register a guest scheduled task that runs in the logged-in user's session (display changes and GUI apps need
+# that), copying the user from Display-lgonly. $1 = name, $2 = program, $3 = arguments. No-op if it exists.
+ensure_guest_task(){
   local out
-  out=$("$GUEST" 60 <<PS 2>&1 | tr -d '\r' | grep -E '^(result=|Looking|LG HDR)'
+  out=$(gps 60 <<PS
+if (Get-ScheduledTask -TaskName '$1' -ErrorAction SilentlyContinue) { 'exists'; exit }
+\$u = (Get-ScheduledTask -TaskName Display-lgonly).Principal.UserId
+\$p = New-ScheduledTaskPrincipal -UserId \$u -LogonType Interactive -RunLevel Limited
+\$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
+\$a = if ('$3') { New-ScheduledTaskAction -Execute '$2' -Argument '$3' } else { New-ScheduledTaskAction -Execute '$2' }
+Register-ScheduledTask -TaskName '$1' -Action \$a -Principal \$p -Settings \$s -Force | Out-Null; 'registered'
+PS
+)
+  case "$out" in *exists*) return 0 ;; *registered*) log "registered guest task $1"; return 0 ;; esac
+  log "could not register guest task $1: $(echo "$out" | tr '\n' ' ')"; return 1
+}
+LAYOUT_ARGS="-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"& C:\\Tools\\display\\display-layout.ps1"
+guest_layout(){  # $1 = lgonly | lgonly4k | hdmi | extended | status
+  vm_running || { log "VM not running: skipping guest layout $1"; return 3; }
+  if [ "$1" = lgonly4k ]; then
+    ensure_guest_task Display-lgonly4k powershell.exe "$LAYOUT_ARGS -Layout lgonly -Width 3840 -Height 2160 -Scale 150 *> C:\\Tools\\display\\last-lgonly4k.out\"" || return 1
+  fi
+  local out
+  out=$(gps 60 <<PS | grep -E '^(result=|Looking|LG HDR)'
 Start-ScheduledTask Display-$1; Start-Sleep 9; Get-Content C:\Tools\display\last-$1.out
 PS
 )
@@ -35,7 +78,10 @@ PS
 client_stop(){ systemctl --user stop lg-client.service 2>/dev/null; pkill -x looking-glass-c 2>/dev/null; true; }   # the client renames its process title, so match comm, not -f
 client_start(){
   client_stop
-  systemd-run --user --unit=lg-client --collect -p Restart=on-abnormal -p RestartSec=3 looking-glass-client >/dev/null   # on-abnormal: closing the window exits 255, which on-failure restarted; crashes (signals) still restart
+  local opts=()
+  # native: the guest already runs at the LG's 3840x2160, so nothing should touch the pixels (overrides client.ini)
+  [ "$(picture)" = native ] && opts=(eglFilter:ffxFSR=no eglFilter:ffxCAS=no)
+  systemd-run --user --unit=lg-client --collect -p Restart=on-abnormal -p RestartSec=3 looking-glass-client "${opts[@]}" >/dev/null   # on-abnormal: closing the window exits 255, which on-failure restarted; crashes (signals) still restart
   sleep 3   # let the client map its window (the script is run twice below in case it was slow)
   local id; id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$KWIN_JS" vm-display-lg 2>/dev/null)
   if [ -n "$id" ]; then
@@ -44,7 +90,7 @@ client_start(){
     sleep 2; id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$KWIN_JS" vm-display-lg 2>/dev/null)
     qdbus6 org.kde.KWin /Scripting/Script"$id" org.kde.kwin.Script.run >/dev/null 2>&1
     sleep 0.5; qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript vm-display-lg >/dev/null 2>&1
-    log "looking-glass-client fullscreen on $LG_OUT"
+    log "looking-glass-client fullscreen on $LG_OUT ($(picture))"
   else log "could not load the KWin script; client is running but may be on the wrong screen"; fi
 }
 DESKFLOW_DESKTOP=/usr/share/applications/org.deskflow.deskflow.desktop
@@ -64,38 +110,160 @@ deskflow_off(){
   pkill -9 -x deskflow 2>/dev/null; pkill -9 -f '^/usr/bin/deskflow-core server' 2>/dev/null; log "deskflow killed"
 }
 deskflow_sync(){ if [ "$(cat "$STATE/mode" 2>/dev/null)" = hdmi ]; then deskflow_on; else deskflow_off; fi; }
-to_lg(){
+to_lg(){  # $1 = noclient: leave the LG on the host desktop
   echo lg > "$STATE/mode"
+  vm_running || echo fsr > "$STATE/picture"   # the picture file follows the guest, and a booting guest comes up at 1080p
   deskflow_off                              # the Looking Glass client passes keyboard/mouse in this mode
   lg-input auto off >/dev/null
   # switch the LG back to DP while the VM's HDMI is still alive (the VM sends that command), then trim the VM layout
-  [ "$(lg-input status)" = dp ] || lg-input dp || log "lg-input dp failed (press the LG joystick > Input > DisplayPort, then 'lg-input rescue')"
+  step input run
+  if [ "$(lg-input status)" = dp ]; then step input skip "already DP"
+  elif lg-input dp; then step input ok DP
+  else log "lg-input dp failed (press the LG joystick > Input > DisplayPort, then 'lg-input rescue')"; step input fail "press the LG joystick > Input > DisplayPort"; fi
   lg-input sync --force >/dev/null 2>&1   # make sure host DP-1 is on
-  guest_layout lgonly || log "guest lgonly layout failed"
-  vm_running && client_start || log "VM not running: client not started"
+  local layout=lgonly; [ "$(picture)" = native ] && layout=lgonly4k
+  step layout run "$layout"
+  if guest_layout "$layout"; then step layout ok "$layout"; else log "guest $layout layout failed"; step layout fail "see C:\\Tools\\display\\display-layout.log"; fi
+  if [ "${1:-}" = noclient ]; then
+    client_stop; step client skip "closed"; notify "LG shows the host; the VM keeps running (vm-display client)"; return 0
+  fi
+  step client run "$(picture)"
+  if vm_running; then client_start; step client ok "$(picture)"; else log "VM not running: client not started"; step client fail "VM not running"; fi
   notify "LG shows the VM through Looking Glass (DP)"
 }
-to_hdmi(){
-  vm_running || { log "VM not running"; notify "VM is not running"; exit 1; }
+to_hdmi(){  # $1 = noswitch: leave the LG on the host
+  vm_running || { log "VM not running"; notify "VM is not running"; step layout fail "VM not running"; return 1; }
   client_stop
-  if ! guest_layout hdmi; then log "guest hdmi layout failed -> back to lg"; to_lg; exit 1; fi
-  sleep 3                                  # let the LG see a signal on HDMI before switching
+  step layout run hdmi
+  if ! guest_layout hdmi; then log "guest hdmi layout failed -> back to lg"; step layout fail "back to Looking Glass"; LAUNCH="" to_lg; return 1; fi
+  step layout ok hdmi
   echo hdmi > "$STATE/mode"
-  deskflow_on || log "deskflow failed to start: use the Looking Glass client or the VM's console for input"
+  step deskflow run
+  if deskflow_on; then step deskflow ok; else log "deskflow failed to start: use the Looking Glass client or the VM's console for input"; step deskflow fail "use the VM's console for input"; fi
+  if [ "${1:-}" = noswitch ]; then   # the watcher turns DP-1 off once the LG is switched to HDMI by hand
+    lg-input auto on >/dev/null; step input skip "left on the host"; notify "Windows is on HDMI; the LG still shows the host"; return 0
+  fi
+  sleep 3                                  # let the LG see a signal on HDMI before switching
+  step input run
   lg-input auto on >/dev/null
-  if ! lg-input hdmi; then log "lg-input hdmi failed -> back to lg"; to_lg; exit 1; fi
+  if ! lg-input hdmi; then log "lg-input hdmi failed -> back to lg"; step input fail "back to Looking Glass"; LAUNCH="" to_lg; return 1; fi
+  step input ok HDMI
   notify "LG shows the VM directly over HDMI"
 }
+
+# ---------------------------------------------------------------- launch
+qga_ping(){ virsh -c qemu:///system qemu-agent-command "$VM" '{"execute":"guest-ping"}' --timeout 5 >/dev/null 2>&1; }
+logon_done(){   # the AtLogon task ran after this boot and has finished (it puts Windows back on 1080p lgonly)
+  gps 30 <<'PS' | grep -q '^done'
+$i = Get-ScheduledTaskInfo Display-lgonly-AtLogon; $t = Get-ScheduledTask Display-lgonly-AtLogon
+$b = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+if ($i.LastRunTime -gt $b -and $t.State -ne 'Running') { 'done' } else { 'wait' }
+PS
+}
+rp_running(){
+  virsh -c qemu:///system qemu-agent-command "$VM" '{"execute":"guest-exec","arguments":{"path":"C:\\Windows\\System32\\tasklist.exe","arg":["/FI","IMAGENAME eq RemotePlay.exe","/NH"],"capture-output":true}}' --timeout 5 2>/dev/null \
+    | python3 -c '
+import json, sys, subprocess, time, base64
+pid = json.load(sys.stdin)["return"]["pid"]
+for _ in range(30):
+    r = subprocess.run(["virsh", "-c", "qemu:///system", "qemu-agent-command", sys.argv[1], json.dumps({"execute": "guest-exec-status", "arguments": {"pid": pid}})], capture_output=True, text=True)
+    st = json.loads(r.stdout)["return"]
+    if st.get("exited"):
+        sys.exit(0 if b"remoteplay.exe" in base64.b64decode(st.get("out-data", "")).lower() else 1)
+    time.sleep(0.2)
+sys.exit(1)' "$VM"
+}
+launch(){
+  local display=lg pic picset='' noswitch='' rp='' ds4=keep rec='' dry=''
+  pic=$(picture)
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --display) display=$2; shift ;;
+      --picture) pic=$2; picset=1; shift ;;
+      --no-switch) noswitch=1 ;;
+      --remote-play) rp=1 ;;
+      --ds4) ds4=$2; shift ;;
+      --record) rec=1 ;;
+      --dry-run) dry=1 ;;
+      *) echo "launch: unknown option $1" >&2; return 2 ;;
+    esac; shift
+  done
+  case "$display" in lg|hdmi) ;; *) echo "launch: --display lg|hdmi" >&2; return 2 ;; esac
+  case "$pic" in fsr|native) ;; *) echo "launch: --picture fsr|native" >&2; return 2 ;; esac
+  LAUNCH=1
+  trap '' PIPE
+  log "launch: display=$display picture=$pic${noswitch:+ no-switch}${rp:+ remote-play} ds4=$ds4${rec:+ record}${dry:+ (dry run)}"
+  if [ -n "$dry" ]; then   # same step sequence, nothing touched
+    local s; for s in vm agent login ds4; do step $s run; sleep 0.6; step $s ok "dry run"; done
+    if [ "$display" = lg ]; then for s in input layout client; do step $s run; sleep 0.7; step $s ok "dry run"; done
+    else for s in layout deskflow; do step $s run; sleep 0.7; step $s ok "dry run"; done
+         if [ -n "$noswitch" ]; then step input skip "left on the host"; else step input run; sleep 0.7; step input ok "dry run"; fi; fi
+    if [ -n "$rp" ]; then step rp run; sleep 0.6; step rp ok "dry run"; else step rp skip; fi
+    if [ -n "$rec" ] && [ "$display" = lg ]; then step rec run; sleep 0.5; step rec ok "dry run"; else step rec skip; fi
+    echo "@done ok"; return 0
+  fi
+  [ -n "$picset" ] && echo "$pic" > "$STATE/picture"
+  local booted='' _
+  step vm run
+  if vm_running; then step vm skip "already running"
+  elif virsh -c qemu:///system start "$VM" >/dev/null 2>&1; then booted=1; step vm ok started
+  else step vm fail "virsh start failed"; echo "@done fail"; return 1; fi
+
+  step agent run
+  for _ in $(seq 90); do qga_ping && break; sleep 2; done
+  if qga_ping; then step agent ok; else step agent fail "no guest agent after 3 min"; echo "@done fail"; return 1; fi
+
+  step login run
+  if [ -z "$booted" ] && logon_done; then step login skip "already logged in"
+  else
+    for _ in $(seq 60); do logon_done && break; sleep 3; done
+    if logon_done; then step login ok; else step login fail "Windows did not log in"; echo "@done fail"; return 1; fi
+  fi
+
+  step ds4 run
+  case "$ds4" in
+    on)  if systemctl --user start ds4-vm; then step ds4 ok on; else step ds4 fail "systemctl --user status ds4-vm"; fi ;;
+    off) systemctl --user stop ds4-vm; step ds4 ok off ;;
+    *)   step ds4 skip "$(systemctl --user is-active ds4-vm)" ;;
+  esac
+
+  local ok=1
+  if [ "$display" = lg ]; then to_lg || ok=
+  else to_hdmi ${noswitch:+noswitch} || ok=; fi
+
+  if [ -n "$rp" ]; then
+    step rp run
+    if rp_running; then step rp skip "already open"
+    elif ensure_guest_task App-RemotePlay "$RP_EXE" "" && gps 30 <<<'Start-ScheduledTask App-RemotePlay' >/dev/null; then
+      for _ in $(seq 15); do rp_running && break; sleep 2; done
+      if rp_running; then step rp ok; else step rp fail "RemotePlay.exe did not start"; fi
+    else step rp fail "could not start the App-RemotePlay task"; fi
+  else step rp skip; fi
+
+  if [ -n "$rec" ] && [ "$display" = lg ]; then
+    step rec run
+    if "$VM_REC" start >/dev/null 2>&1; then step rec ok; else step rec fail "vm-rec start failed"; fi
+  else step rec skip; fi
+
+  if [ -n "$ok" ]; then echo "@done ok"; else echo "@done fail"; return 1; fi
+}
+
 case "${1:-status}" in
-  lg)     to_lg ;;
-  hdmi)   to_hdmi ;;
-  toggle) if [ "$(cat "$STATE/mode" 2>/dev/null)" = hdmi ]; then to_lg; else to_hdmi; fi ;;
+  lg)     case "${2:-}" in fsr|native) echo "$2" > "$STATE/picture" ;; "") ;; *) echo "usage: vm-display lg [fsr|native]" >&2; exit 2 ;; esac
+          to_lg ;;
+  hdmi)   case "${2:-}" in --no-switch) to_hdmi noswitch ;; "") to_hdmi ;; *) echo "usage: vm-display hdmi [--no-switch]" >&2; exit 2 ;; esac || exit 1 ;;
+  host)   to_lg noclient ;;
+  toggle) if [ "$(cat "$STATE/mode" 2>/dev/null)" = hdmi ]; then to_lg; else to_hdmi || exit 1; fi ;;
   client) client_start ;;
+  launch) shift; launch "$@" ;;
+  shutdown) "$VM_REC" stop >/dev/null 2>&1 || true
+            if vm_running; then virsh -c qemu:///system shutdown "$VM" >/dev/null && log "shutdown requested"
+            else echo "VM is not running" >&2; fi ;;
   deskflow) case "${2:-sync}" in on) deskflow_on ;; off) deskflow_off ;; sync) deskflow_sync ;; *) echo "usage: vm-display deskflow on|off|sync" >&2; exit 2 ;; esac ;;
-  status) echo "mode:   $(cat "$STATE/mode" 2>/dev/null || echo unset)"
+  status) echo "mode:   $(cat "$STATE/mode" 2>/dev/null || echo unset)   picture: $(picture)"
           echo "input:  $(lg-input status 2>/dev/null)   (lg-input auto: $(lg-input auto 2>/dev/null))"
           echo "client: $(systemctl --user is-active -q lg-client.service && echo running || echo stopped)"
           echo "deskflow: $(deskflow_running && echo running || echo stopped)"
           echo -n "VM:     "; vm_running && guest_layout status 2>&1 | grep -E 'Looking|LG HDR' || echo "not running" ;;
-  *) echo "usage: vm-display lg|hdmi|toggle|status|client|deskflow on|off|sync" >&2; exit 2 ;;
+  *) echo "usage: vm-display lg [fsr|native]|hdmi [--no-switch]|host|toggle|status|client|launch ...|shutdown|deskflow on|off|sync" >&2; exit 2 ;;
 esac

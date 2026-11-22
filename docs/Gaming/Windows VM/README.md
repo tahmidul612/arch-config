@@ -25,7 +25,7 @@ To make that playable, the VM gets:
  libvirt NAT 192.168.122.1  <---------------------------->  192.168.122.x -> internet -> PSN
 ```
 
-There are two ways to see the VM: a Looking Glass window on the host (the default) or the monitor plugged straight into the iGPU's HDMI port, switched over with DDC/CI.
+There are two ways to see the VM: a Looking Glass window on the host (the default) or the monitor plugged straight into the iGPU's HDMI port, switched over with DDC/CI. The [Launcher](launcher.md) ("Windows VM" in the app menu) starts the VM and picks between them in one step.
 
 ## Status
 
@@ -60,7 +60,8 @@ As of 2026-11-21. "Confirmed" means it was used in a real session; "tested" mean
 6. [Audio](audio.md): PipeWire backend and the loopback sink
 7. [Recording](recording.md): host OBS through Looking Glass, guest OBS as the alternative
 8. [Switching](switching.md): lg ↔ hdmi, LG input switching, host ↔ guest recording
-9. [Troubleshooting](troubleshooting.md): symptoms, everything that was tried, open items
+9. [Launcher](launcher.md): one window to start the VM and choose the display path
+10. [Troubleshooting](troubleshooting.md): symptoms, everything that was tried, open items
 10. [Rollback](rollback.md): undo any step
 
 The helper files are in [`tools/win11-vm/`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/README.md).

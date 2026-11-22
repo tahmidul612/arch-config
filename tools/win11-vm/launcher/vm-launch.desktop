@@ -1,0 +1,29 @@
+[Desktop Entry]
+Type=Application
+Name=Windows VM
+GenericName=Windows VM launcher
+Comment=Start the Windows VM for PS Remote Play over Looking Glass (1080p with FSR, or native 4K) or direct HDMI
+Exec=/home/<USER>/.local/bin/vm-launch
+Icon=net.local.vm-launch
+Terminal=false
+Categories=Game;Emulator;
+Keywords=windows;vm;win11;remote play;ps5;looking glass;hdmi;fsr;libvirt;
+StartupWMClass=vm-launch
+SingleMainWindow=true
+Actions=go;host;shutdown;dry-run;
+
+[Desktop Action go]
+Name=Launch with last settings
+Exec=/home/<USER>/.local/bin/vm-launch --go
+
+[Desktop Action host]
+Name=Back to host
+Exec=/home/<USER>/.local/bin/vm-display host
+
+[Desktop Action shutdown]
+Name=Shut down Windows
+Exec=/home/<USER>/.local/bin/vm-display shutdown
+
+[Desktop Action dry-run]
+Name=Dry run (changes nothing)
+Exec=/home/<USER>/.local/bin/vm-launch --dry-run

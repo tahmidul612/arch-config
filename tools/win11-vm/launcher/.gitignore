@@ -1,0 +1,5 @@
+target/
+node_modules/
+gen/
+# the root .gitignore drops vendor/; the UI needs its vendored GSAP
+!ui/vendor/

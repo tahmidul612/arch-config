@@ -12,7 +12,7 @@ One command does everything; the mode is stored in `~/.local/state/vm-display/mo
 | hdmi → lg | `vm-display lg` | ++meta+ctrl+f11++ (toggle) | ++ctrl+alt+f11++ (toggle) |
 | Something is stuck | `lg-input rescue` | ++meta+ctrl+shift+f11++ | |
 
-The app launcher also has "LG monitor: show the VM" (`vm-display hdmi`), "LG monitor: show the host" (`vm-display lg`), "toggle" and "rescue". Nothing needs a VM restart.
+The [Launcher](launcher.md) does the same from a window (plus starting the VM, Remote Play and a recording). The app launcher also has "LG monitor: show the VM" (`vm-display hdmi`), "LG monitor: show the host" (`vm-display lg`), "toggle" and "rescue". Nothing needs a VM restart.
 
 === "lg → hdmi"
 

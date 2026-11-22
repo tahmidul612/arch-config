@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Windows VM</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <h1 id="title">Windows VM</h1>
+    <span class="dry" id="dry" hidden>dry run</span>
+    <div class="chip" id="vmchip"><span class="dot"></span><span id="vmtext">checking</span></div>
+  </header>
+
+  <div class="cols">
+    <!-- live state / launch steps -->
+    <aside class="side" aria-live="polite">
+      <div class="label" id="sidelabel">Now</div>
+      <ul class="stats" id="stats"></ul>
+      <ol class="steps" id="steps" hidden></ol>
+      <div class="sidefoot">
+        <button class="btn ghost" id="host" title="Show the host desktop on the LG; Windows keeps running">Back to host</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <figure class="path" id="path" aria-label="Signal path">
+        <svg viewBox="0 0 520 96" role="img">
+          <g class="wires">
+            <path id="w1" class="wire" d="M92 34 H188"/>
+            <path id="w2" class="wire" d="M332 34 H428"/>
+            <path id="w1on" class="wire on" d="M92 34 H188"/>
+            <path id="w2on" class="wire on" d="M332 34 H428"/>
+          </g>
+          <circle id="pulse" class="pulse" r="3.5" cx="92" cy="34"/>
+          <g class="node" id="n1"><rect x="4" y="14" width="88" height="40" rx="8"/><text class="nlab" x="48" y="39">Windows</text></g>
+          <g class="node mid" id="n2"><rect x="188" y="14" width="144" height="40" rx="8"/><text class="nlab" id="n2lab" x="260" y="39">Looking Glass</text></g>
+          <g class="node" id="n3"><rect x="428" y="14" width="88" height="40" rx="8"/><text class="nlab" x="472" y="39">LG HDR 4K</text></g>
+          <text class="nsub" id="s1" x="48" y="80">1920×1080</text>
+          <text class="nsub" id="s2" x="260" y="80">FSR 1 → 2160p</text>
+          <text class="nsub" id="s3" x="472" y="80">DisplayPort</text>
+        </svg>
+        <figcaption id="pathnote"></figcaption>
+      </figure>
+
+      <div class="group">
+        <div class="label" id="lbl-display">Display</div>
+        <div class="seg" role="radiogroup" aria-labelledby="lbl-display" data-key="display">
+          <button role="radio" data-value="lg"><strong>Looking Glass</strong><span>LG stays on DP, client fullscreen</span></button>
+          <button role="radio" data-value="hdmi"><strong>Direct HDMI</strong><span>LG switches to the iGPU</span></button>
+          <i class="thumb" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="label" id="lbl-picture">Picture</div>
+        <div class="seg" role="radiogroup" aria-labelledby="lbl-picture" data-key="picture">
+          <button role="radio" data-value="fsr"><strong>1080p + FSR</strong><span>half the iGPU load</span></button>
+          <button role="radio" data-value="native"><strong>4K native</strong><span>no upscaling, no filters</span></button>
+          <i class="thumb" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="label">Extras</div>
+        <div class="toggles">
+          <label class="tg" data-key="remote_play"><input type="checkbox"><span class="sw" aria-hidden="true"></span><span class="tt">Open PS Remote Play<small>starts it in Windows</small></span></label>
+          <label class="tg" data-key="ds4"><input type="checkbox"><span class="sw" aria-hidden="true"></span><span class="tt">Virtual DualShock 4<small>Xbox pad → DS4 in Remote Play</small></span></label>
+          <label class="tg" data-key="switch_input"><input type="checkbox"><span class="sw" aria-hidden="true"></span><span class="tt">Switch the LG to HDMI<small data-why="Direct HDMI only">turns host DP-1 off</small></span></label>
+          <label class="tg" data-key="record"><input type="checkbox"><span class="sw" aria-hidden="true"></span><span class="tt">Record with OBS<small data-why="Looking Glass only">host capture, NVENC</small></span></label>
+          <label class="tg" data-key="close_after"><input type="checkbox"><span class="sw" aria-hidden="true"></span><span class="tt">Close when ready<small>quit this window after launch</small></span></label>
+        </div>
+      </div>
+
+      <footer class="foot">
+        <button class="btn hold" id="shutdown" title="Hold to shut Windows down"><span class="fill" aria-hidden="true"></span><span class="txt">Hold to shut down</span></button>
+        <p class="msg" id="msg" role="status"></p>
+        <button class="btn pri" id="go"><span id="golabel">Launch</span><kbd>↵</kbd></button>
+      </footer>
+    </main>
+  </div>
+</div>
+<script src="vendor/gsap.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
