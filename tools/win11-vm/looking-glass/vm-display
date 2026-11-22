@@ -32,7 +32,7 @@ set -uo pipefail
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/vm-display; mkdir -p "$STATE"
 HERE=$(dirname "$(readlink -f "$0")")     # install as a symlink: ln -s <repo>/tools/win11-vm/looking-glass/vm-display ~/.local/bin/
 VM=${VM:-win11}
-GUEST=$HERE/../guest-ps.py
+QGA=$(command -v qga || echo "$HOME/.local/bin/qga")   # tools/win11-vm/qga, installed by tools/resmon/install.sh
 KWIN_JS=$HERE/lg-client-to-output.js
 VM_REC=$HERE/vm-rec
 LG_OUT=DP-1
@@ -43,7 +43,7 @@ step(){ [ -n "$LAUNCH" ] && echo "@step $*"; return 0; }
 notify(){ [ -n "$LAUNCH" ] && return 0; notify-send -a "VM display" -i video-display "VM display" "$1" 2>/dev/null || true; }
 vm_running(){ [ "$(virsh -c qemu:///system domstate "$VM" 2>/dev/null)" = "running" ]; }
 picture(){ local p; p=$(cat "$STATE/picture" 2>/dev/null); [ "$p" = native ] && echo native || echo fsr; }
-gps(){ "$GUEST" "$@" 2>&1 | tr -d '\r'; }   # PowerShell from stdin, run in the guest (as SYSTEM)
+gps(){ "$QGA" --vm "$VM" exec "$@" 2>&1 | tr -d '\r'; }   # PowerShell from stdin, run in the guest (as SYSTEM); status = guest exit code
 
 # Register a guest scheduled task that runs in the logged-in user's session (display changes and GUI apps need
 # that), copying the user from Display-lgonly. $1 = name, $2 = program, $3 = arguments. No-op if it exists.

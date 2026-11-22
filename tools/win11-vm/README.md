@@ -36,7 +36,7 @@ Nothing here contains secrets. Where a file needs a user, host or path from your
 | `monitor-input/net.local.lg-input-*.desktop`, `register-shortcuts.py` | `~/.local/share/applications/` (fill in `<USER>`); shortcuts via kglobalaccel | `python3 register-shortcuts.py` once | Default |
 | `guest/display-layout.ps1` | guest `C:\Tools\display\` | tasks `Display-*` (plus `Display-lgonly4k` for the native 4K picture); `lgonly` defaults to 1920x1080 @100%, `hdmi`/`extended` to 3840x2160 @150% | Default |
 | `guest/lg-igcl.ps1`, `guest/lg-vm-toggle.ps1` | guest `C:\Tools\monitor\` | tasks `LgInput-*` | Default |
-| `guest/no-gamebar-popup.ps1` | guest `C:\Tools\controller\` | run once through `guest-ps.py` (`-Undo` reverses it) | Default (2026-11-22: `ms-gamebar://` opened the Open-With dialog before, nothing after) |
+| `guest/no-gamebar-popup.ps1` | guest `C:\Tools\controller\` | run once through `qga exec` (`-Undo` reverses it) | Default (2026-11-22: `ms-gamebar://` opened the Open-With dialog before, nothing after) |
 | `guest/register-tasks.ps1` | run once in the guest, elevated | `register-tasks.ps1 -User <WINDOWS_USER>` | Written for the docs, not run (the tasks it creates were) |
 | `xbox-vm-attach`, `xbox-vm-attach@.service`, `99-xbox-vm-attach.rules`, `xbox-vm-attach-install.sh` | `/usr/local/bin/`, `/etc/systemd/system/`, `/etc/udev/rules.d/` | `sudo ./xbox-vm-attach-install.sh` | Superseded: worked, but Remote Play ignores an Xbox pad; `ds4-host-prep.sh` disables the rule |
 

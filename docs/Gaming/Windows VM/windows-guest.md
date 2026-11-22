@@ -4,28 +4,33 @@ Windows 11 Pro (build 26100) with the QEMU guest agent from the virtio-win ISO. 
 
 ## Running commands in the guest
 
-[`guest-ps.py`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/guest-ps.py) sends a PowerShell script through `guest-exec` and prints its output and exit code.
+[`qga`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/qga/src/main.rs) talks to the guest agent through libvirt directly. `qga exec` sends a PowerShell script through `guest-exec`, prints its output, then `[exit N]` on stderr, and exits with the script's exit code. Build and install it once (the [resmon installer](https://github.com/tahmidul612/arch-config/blob/main/tools/resmon/install.sh) does this too):
 
 ```bash
-cd tools/win11-vm
-./guest-ps.py 120 <<'EOF'
+cargo build --release --manifest-path tools/Cargo.toml -p qga
+install -Dm755 -t ~/.local/bin tools/target/release/qga
+qga exec 120 <<'EOF'
 Get-CimInstance Win32_VideoController | Select Name, DriverVersion, Status
 EOF
 ```
+
+Check it: `qga exec <<<'$PSVersionTable.PSVersion'` prints the guest's PowerShell version and `[exit 0]`. `--vm <name>` (or `$VM`) picks another domain; the default is `win11`.
 
 What to know about it:
 
 - The script runs as **SYSTEM in session 0**. It cannot see the desktop: no windows, no screenshots, and XInput shows no controllers from there. For anything that needs the logged-in desktop, register a scheduled task with an `Interactive` principal for the Windows user and start it (the `IdleShutdown` task below is an example).
 - Output can contain PowerShell CLIXML progress records; filter lines starting with `#< CLIXML` and `<Objs`.
-- Large scripts fail with "Unable to encode message payload". Upload the `.ps1` with `qga-push.py` and run the file instead.
+- Large scripts fail with "Unable to encode message payload". Upload the `.ps1` with `qga push` and run the file instead.
 - In Windows PowerShell 5.1, a hex literal like `0x80000000` is a negative Int32. Write `[uint32]2147483648`.
 
 ### Copying files
 
 | Direction | Tool | Chunk size | Measured |
 | --- | --- | --- | --- |
-| Host → guest | [`qga-push.py`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/qga-push.py) `<host file> <guest path>` | 64 KiB, libvirt Python bindings | ~35 MB/s |
-| Guest → host | [`qga-pull.py`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/qga-pull.py) `<guest path> <host file>` | 1 MiB | ~22 MB/s |
+| Host → guest | `qga push <host file> <guest path>` | 64 KiB | ~28 MB/s |
+| Guest → host | `qga pull <guest path> <host file>` | 1 MiB | ~37 MB/s |
+
+Measured on 2026-11-22 with a 200 MB random file; the sha256 matched after the round trip. `qga pull` writes `<host file>.part` and renames it when the copy is complete.
 
 Larger chunks fail. A 1 MiB write hangs the Windows agent and leaks the file handle, which keeps that file name locked until the guest reboots. 4 MiB exceeds libvirt's RPC limit, and 16 MiB reads time out. Check the hash on both sides after a big copy (`sha256sum` and `Get-FileHash`).
 
@@ -91,9 +96,9 @@ The PS button on the [virtual DualShock 4](input.md#virtual-dualshock-4) is the 
 What it does: removes the popup. Why both: an earlier fix set only the first value, and on 2026-11-22 the guest had it back at 1 with the popup showing. Install and run it through the guest agent (it runs as SYSTEM and finds the user from the `Display-lgonly` task, or pass `-User`):
 
 ```bash
-./guest-ps.py <<<'New-Item -ItemType Directory C:\Tools\controller -Force | Out-Null'
-./qga-push.py guest/no-gamebar-popup.ps1 'C:\Tools\controller\no-gamebar-popup.ps1'
-./guest-ps.py <<<'& C:\Tools\controller\no-gamebar-popup.ps1'
+qga exec <<<'New-Item -ItemType Directory C:\Tools\controller -Force | Out-Null'
+qga push guest/no-gamebar-popup.ps1 'C:\Tools\controller\no-gamebar-popup.ps1'
+qga exec <<<'& C:\Tools\controller\no-gamebar-popup.ps1'
 ```
 
 Check it: the script prints `UseNexusForGameBarEnabled=0` and `True` for the three links. Opening `ms-gamebar://` in the user's session (`cmd /c start "" ms-gamebar://` from a task that runs as that user) then starts no `OpenWith` process, the process behind the dialog. Undo with `no-gamebar-popup.ps1 -Undo`. Tested on 2026-11-22: without the fix that link opened `OpenWith`, with it nothing; the DS4 re-attaching afterwards showed no dialog either. Not yet watched on screen over several sessions.
@@ -111,7 +116,7 @@ Install it as the logged-in user (replace `<WINDOWS_USER>`):
 
 ```powershell
 New-Item -ItemType Directory -Force C:\Tools\idle-shutdown | Out-Null
-# copy idle-shutdown.ps1 there (qga-push.py), then:
+# copy idle-shutdown.ps1 there (qga push), then:
 $a = New-ScheduledTaskAction -Execute powershell.exe -Argument '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\Tools\idle-shutdown\idle-shutdown.ps1 -IdleMinutes 60'
 $t = New-ScheduledTaskTrigger -AtLogOn -User <WINDOWS_USER>
 $s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
