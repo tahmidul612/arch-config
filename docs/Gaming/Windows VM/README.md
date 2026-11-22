@@ -29,7 +29,7 @@ There are two ways to see the VM: a Looking Glass window on the host (the defaul
 
 ## Status
 
-Active right now (2026-11-21, evening): lg mode with the guest at 3840x2160 and 150% scaling, `ds4-vm.service` enabled, Deskflow stopped (it runs only in hdmi mode), host OBS profile VM-Capture ready.
+Active right now (2026-11-21, night): lg mode with the guest at 1920x1080 (100%) upscaled to 4K by the Looking Glass client's FSR 1, `ds4-vm.service` enabled, Deskflow stopped (it runs only in hdmi mode), host OBS profile VM-Capture ready.
 
 As of 2026-11-21. "Confirmed" means it was used in a real session; "tested" means it was checked by commands or a benchmark only.
 
@@ -39,8 +39,8 @@ As of 2026-11-21. "Confirmed" means it was used in a real session; "tested" mean
 | CPU | 8 vCPU, one socket, pinned to P-cores 8-15, emulator on E-cores 16-19 | In use; benefit not measured |
 | Network | libvirt NAT `default` | Confirmed |
 | iGPU | VFIO, UPT mode, `Universal_noGOP_igd.rom`, Intel driver 32.0.101.7088 | Confirmed |
-| Display | lg mode: Looking Glass at native 4K on the LG over DP (default); hdmi mode: Windows on the LG's HDMI input; switched with `vm-display` | Both modes and the switching confirmed clean; Remote Play through Looking Glass not yet |
-| Recording | Host OBS from Looking Glass, NVENC HEVC, 4K canvas to 1080p60 (`vm-rec`) | Benchmarks only |
+| Display | lg mode: guest at 1080p, Looking Glass client upscales to the 4K LG over DP with FSR 1 (default); hdmi mode: Windows at 4K on the LG's HDMI input; switched with `vm-display` | Both modes and the switching confirmed clean; 1080p + FSR measured as sharp as a 4K guest for a simulated Remote Play stream ([Display](display.md#resolution-and-upscaling)); a real Remote Play session through Looking Glass not yet |
+| Recording | Host OBS from Looking Glass, NVENC HEVC, 1080p60 (`vm-rec`) | Benchmarks only |
 | Controller | Virtual DS4 from the Xbox pad (`ds4gadget.py`), run by `ds4-vm.service` only while Remote Play is open | Gadget confirmed (6+ hours, started by hand); the service tested only |
 | Keyboard and mouse | lg mode: the Looking Glass client. hdmi mode: Deskflow 1.27, TLS pinned, UFW rule on `virbr0`, started by `vm-display` | Deskflow confirmed on the HDMI monitor (mouse, keyboard, clipboard) |
 | Audio | QEMU PipeWire backend, `win11_vm` loopback sink | Backend confirmed ("works and in sync"); the sink tested, including a VM restart |

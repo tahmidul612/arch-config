@@ -23,18 +23,19 @@ Nothing here contains secrets. Where a file needs a user, host or path from your
 | `ds4-host-prep.sh` | `/etc/udev/rules.d/70-raw-gadget.rules`, loads `dummy_hcd` + `raw_gadget` | `sudo ./ds4-host-prep.sh` | Default |
 | `ds4-modules-setup.sh` | `/etc/modules-load.d/ds4-gadget.conf` | `./ds4-modules-setup.sh` (asks for sudo) | Default |
 | `ds4-vm.py`, `ds4gadget.py`, `ds4_report_desc.bin` | `~/.local/lib/ds4-vm/` (needs `python-evdev`, `python-libvirt`) | copy; `python3 ds4gadget.py [--log FILE] [--no-pad] [-v]` by hand | Default |
+| `upscale-bench/` | run from there; data in `$UPSCALE_DIR` (default `~/Videos/vm-upscale-test`) | see its README | Benchmark (Looking Glass upscaling vs a 4K guest, frame rate) |
 | `ds4-bench/` | run from there | `./run-bench.sh`, see its README | Benchmark (Python vs Rust gadget latency) |
 | `ds4-vm.service` | `~/.config/systemd/user/` | `systemctl --user enable --now ds4-vm` | Default (tested by the setup session only) |
 | `looking-glass/lg-host-setup.sh` | AUR packages, `/etc/tmpfiles.d/10-looking-glass.conf` | `./lg-host-setup.sh` as your user | Default |
 | `looking-glass/10-looking-glass.conf` | `/etc/tmpfiles.d/` (written by the script) | reference | Default |
-| `looking-glass/client.ini` | `~/.config/looking-glass/` | copy | Default |
+| `looking-glass/client.ini` | `~/.config/looking-glass/` | copy (FSR 1 upscaling on) | Default |
 | `looking-glass/vm-display`, `looking-glass/lg-client-to-output.js` | symlink `vm-display` into `~/.local/bin/` | `vm-display lg\|hdmi\|toggle\|status\|client\|deskflow` | Default |
 | `looking-glass/vm-display-deskflow.desktop` | `~/.config/autostart/` (fill in `<USER>`) | | Default |
 | `looking-glass/vm-rec`, `looking-glass/obsws.py` | symlink `vm-rec` into `~/.local/bin/` (needs `python-websockets`) | `vm-rec start\|stop\|status` | Default (benchmarks only) |
 | `looking-glass/obs/basic.ini`, `recordEncoder.json`, `VM-Capture.json` | `~/.config/obs-studio/basic/profiles/VM-Capture/`, `.../scenes/` (fill in `<RECORDINGS_DIR>`) | | Default |
 | `monitor-input/lg-input`, `lg-input-watch.service` | `~/.local/bin/`, `~/.config/systemd/user/` | `systemctl --user enable --now lg-input-watch` | Default |
 | `monitor-input/net.local.lg-input-*.desktop`, `register-shortcuts.py` | `~/.local/share/applications/` (fill in `<USER>`); shortcuts via kglobalaccel | `python3 register-shortcuts.py` once | Default |
-| `guest/display-layout.ps1` | guest `C:\Tools\display\` | tasks `Display-*` | Default |
+| `guest/display-layout.ps1` | guest `C:\Tools\display\` | tasks `Display-*`; `lgonly` defaults to 1920x1080 @100%, `hdmi`/`extended` to 3840x2160 @150% | Default |
 | `guest/lg-igcl.ps1`, `guest/lg-vm-toggle.ps1` | guest `C:\Tools\monitor\` | tasks `LgInput-*` | Default |
 | `guest/register-tasks.ps1` | run once in the guest, elevated | `register-tasks.ps1 -User <WINDOWS_USER>` | Written for the docs, not run (the tasks it creates were) |
 | `xbox-vm-attach`, `xbox-vm-attach@.service`, `99-xbox-vm-attach.rules`, `xbox-vm-attach-install.sh` | `/usr/local/bin/`, `/etc/systemd/system/`, `/etc/udev/rules.d/` | `sudo ./xbox-vm-attach-install.sh` | Superseded: worked, but Remote Play ignores an Xbox pad; `ds4-host-prep.sh` disables the rule |
@@ -46,10 +47,11 @@ These files were first written and run on the machine during setup. The repo cop
 - `host-setup.sh` downloads the iGPU ROM from the [LongQT-sea/intel-igpu-passthru v0.1 release](https://github.com/LongQT-sea/intel-igpu-passthru/releases/tag/v0.1) and checks its sha256 (the original copied a local file with the same hash). It backs up GRUB to `/etc/default/grub.pre-vfio-igpu` instead of next to the script, and `host-rollback.sh` reads it from there.
 - `ds4-host-prep.sh` (originally `host-prep.sh`) gives `/dev/raw-gadget` to `$SUDO_USER` instead of a fixed user name.
 - `guest-ps.py`, `qga-push.py`, `qga-pull.py`, `ds4-vm.py` and `xbox-vm-attach` read the domain name from `VM`.
+- `display-layout.ps1`, `client.ini` and the OBS profile were changed on 2026-11-21 for the 1080p guest (lgonly defaults, FSR, 1920x1080 canvas) and installed in the guest, `~/.config/looking-glass/` and the running OBS.
 - `ds4-vm.py` was changed after it ran: it uses `python-libvirt` instead of spawning `virsh` (idle CPU went from about 1.2% of a core to under 0.1%), and `ds4gadget.py` closes the pad's device when it is unplugged. Both copies were installed and the attach/detach checked on 2026-11-21.
 - `deskflow/` holds templates of the configs the setup produced; `make-certs.sh` repeats the certificate commands that were run by hand.
 - `xml/win11.xml` has no UUID, MAC or VNC password, and placeholders for the disk, ISO and runtime directory.
-- `looking-glass/vm-display` and `vm-rec` find `guest-ps.py`, the KWin script and `obsws.py` relative to their own (symlink-resolved) location instead of a backup folder, and `vm-display` reads `VM`. `client.ini`'s comment now says 4K.
+- `looking-glass/vm-display` and `vm-rec` find `guest-ps.py`, the KWin script and `obsws.py` relative to their own (symlink-resolved) location instead of a backup folder, and `vm-display` reads `VM`. `client.ini` has since been changed: FSR 1 on, `lgmp:shmDevice` instead of `app:shmFile`, comment for the 1080p guest.
 - `monitor-input/lg-input` reads `VM`, and its stand-down marker is described generically.
 - `.desktop` files, the tmpfiles rule and the OBS profile have `<USER>` / `<RECORDINGS_DIR>` placeholders; the OBS profile lost two machine-specific lines (`FFFilePath`, `CookieId`).
 - The display XML is the same for lg and hdmi mode (they differ only inside Windows), so there is one `xml/win11.xml`.

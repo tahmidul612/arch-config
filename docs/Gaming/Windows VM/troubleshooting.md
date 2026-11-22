@@ -66,6 +66,22 @@ A `guest-file-write` with too large a chunk hung the agent and leaked the handle
 
 The silent install can't ask whether to trust the publisher. Add HostFission's certificate to `LocalMachine\TrustedPublisher` and run `LGIddInstall.exe install LGIdd LGInput` ([Display](display.md#looking-glass), Guest tab).
 
+### The Looking Glass client shows only its splash screen
+
+The client is connected but the guest sends no frames: no `Format:` line in `journalctl --user -u lg-client` after "Starting session". The upscaling tests hit this several times on 2026-11-21, each after many client restarts and guest resolution changes in a row; restarting the client or re-applying the layout did not help. Restart the IDD in the guest (Device Manager, or elevated PowerShell), then `vm-display lg`:
+
+```powershell
+$d = Get-PnpDevice -FriendlyName 'Looking Glass Indirect Display Device'
+Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false; Start-Sleep 3
+Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false
+```
+
+Afterwards the client may sit in a small window; `vm-display client` puts it back full screen on DP-1.
+
+### The 1080p guest looks blocky in the Looking Glass client
+
+FSR is off, or the client hasn't had a new frame since it started: the first frame is drawn before the filter is set up. Open or move a window in Windows; if it stays blocky, check `[eglFilter] ffxFSR=yes` in `~/.config/looking-glass/client.ini` and the overlay (++right-ctrl+o++). Without FSR the client scales an exact 2x with nearest neighbour.
+
 ### No 4K modes in the guest with Looking Glass
 
 The shared memory is too small: 64 MiB fits 1440p only. Set the `shmem` size to 128 MiB, `truncate -s 0 /dev/shm/looking-glass`, and fully stop and start the VM.
@@ -156,8 +172,10 @@ What was tried and dropped, with the reason. None of these are steps to follow.
 | SPICE with streaming off + remote-viewer, Sunshine/Moonlight inside the VM | Not tried | The iGPU passthrough came first and made them unnecessary. |
 | HDMI dummy plug, capture card | Not tried | Wanted a solution without extra hardware. The Looking Glass IDD needs neither. |
 | 1440p desktop (2026-11-21) | Superseded | Set to cut the load of guest recording. Back to native 4K once recording moved to the host and 1440p looked soft in Looking Glass. |
+| Native 4K desktop at 150% in lg mode (2026-11-21) | Superseded | Remote Play streams 1080p, so the guest only upscaled it. Replaced by 1080p + client FSR: as sharp or sharper for the stream, guest iGPU 41% instead of 79%. |
 | Looking Glass B7 (stable) | Not used | No IDD, so it would still need a monitor or dummy plug on the iGPU. |
-| Looking Glass at 1440p, upscaled to the 4K panel | Superseded | Text looked softer than on HDMI. Now native 4K at 150% with 128 MiB shared memory. |
+| Looking Glass at 1440p, upscaled to the 4K panel | Superseded | Text looked softer than on HDMI. |
+| Looking Glass upscaling a 1080p guest: default (nearest), linear, CAS 0.5, FSR 1 at 0.0/0.5/1.0, FSR 1 + CAS 0.5 | **FSR 1 at 1.0 used** | Best VMAF NEG of all, level with or ahead of a 4K guest (lanczos/bicubic stand-ins for Remote Play's scaler). Linear blurs (-9 VMAF); CAS on top of FSR oversharpens. Measured with [`upscale-bench`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/upscale-bench/README.md); see [Display](display.md#resolution-and-upscaling). |
 | Mirroring the Looking Glass monitor and the HDMI output | Failed | `SDC_TOPOLOGY_CLONE` returned 31, a supplied clone config 87, `DisplaySwitch /clone` did nothing: the two are on different adapters and no path feeds the IDD from the Intel source. Replaced by the lg and hdmi modes. |
 | **lg mode** and **hdmi mode** with `vm-display` | **Used** | See [Display](display.md). |
 
@@ -206,11 +224,13 @@ Each with the test that would settle it. Status as of 2026-11-21.
 | Item | How to settle it |
 | --- | --- |
 | Remote Play streamed in lg mode: does its anti-tamper object to the Looking Glass IDD; quality and latency | Play a session through the Looking Glass client. |
-| Text sharpness at native 4K in lg mode | Compare the same window in lg and hdmi mode. |
+| Desktop text at 1080p + FSR in lg mode | Compare the same window in lg and hdmi mode (hdmi stays native 4K). |
+| Remote Play's own frame pacing through Looking Glass (the frame-rate test used a WPF player) | Turn on the client's FPS display (++right-ctrl+d++) in a session; UPS should stay near 60. |
 | `vm-rec` on real gameplay | Record a session; check smooth video (`mpdecimate`) and game audio. |
 | VM audio after a host reboot (a VM restart is already verified) | Reboot the host, start the VM, check `pactl list sink-inputs short`. Fallback: pin QEMU's stream to the sink in the XML. |
 | Virtual DS4: pad unplug during a session, VM stop and start, first host reboot | Do each once with `journalctl --user -u ds4-vm -f` open. |
-| `Display-lgonly-AtLogon` on the next VM boot | Boot the VM; `vm-display status` shows the Looking Glass monitor at 4K. |
+| hdmi ↔ lg round trip with the new per-layout resolutions (the virtual monitor now changes 4K ↔ 1080p, which preceded every stuck-splash case in the tests) | `vm-display hdmi`, then `vm-display lg`: the guest at 3840x2160 150%, then 1920x1080 100%, and `journalctl --user -u lg-client` shows a `Format:` line. Not run yet: the LG stopped answering DDC on DP-1 the same night. |
+| `Display-lgonly-AtLogon` on the next VM boot | Boot the VM; `vm-display status` shows the Looking Glass monitor at 1920x1080 100%. |
 | Deskflow in hdmi mode | Move the mouse into the VM after `vm-display hdmi`. |
 | LG switching: VM shutdown in hdmi mode (guest hook to DP, then the watcher runs `vm-display lg`) | Shut Windows down in hdmi mode and check that the LG lands on the Looking Glass client. |
 | `lg-input rescue` and its shortcut | Press ++meta+ctrl+shift+f11++ in hdmi mode. |
@@ -223,6 +243,7 @@ Each with the test that would settle it. Status as of 2026-11-21.
 
 | Item | How to settle it |
 | --- | --- |
+| Slideshow-like playback seen on the LG during the 2026-11-21 playback benchmark (`perf.py`) | Not reproduced: the frame-rate test (`fps.py`) measured about 60 frames per second for both guest resolutions. `perf.py` polled the guest's GPU engine counters (`Get-Counter`) while the clip played and `fps.py` did not, so that polling is the first suspect; the run also overlapped a moment with two Looking Glass clients. Re-run `perf.py` with the client's FPS display on. |
 | Does CPU pinning help? | Compare frame pacing with and without `<cputune>`. |
 | Why does 9.5 crash without ViGEmBus? | Read `RemotePlayCrashInfo_*.txt` after a 9.5 crash, or try hiding the hypervisor (`<kvm><hidden state='on'/></kvm>`). |
 | Why did macvtap get no internet? | Check the router's client list and DHCP log while the VM is on macvtap. |

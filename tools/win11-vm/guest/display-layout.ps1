@@ -4,7 +4,13 @@
 #   -Layout extended  Looking Glass primary at (0,0), LG extended at (Width,0)
 #   -Layout status    print the active layout
 # Failsafe: if the result has no active Looking Glass monitor, it re-applies lgonly. Log: C:\Tools\display\display-layout.log
-param([ValidateSet('lgonly','hdmi','extended','status')][string]$Layout='status', [int]$Width=3840, [int]$Height=2160, [int]$Hz=60, [int]$Scale=150)
+param([ValidateSet('lgonly','hdmi','extended','status')][string]$Layout='status', [int]$Width=0, [int]$Height=0, [int]$Hz=60, [int]$Scale=0)
+# Defaults by layout: lgonly 1920x1080 @100% (the host's Looking Glass client upscales it to the 4K LG with FSR,
+# measured as sharp as a 4K desktop for Remote Play at half the iGPU load); hdmi/extended 3840x2160 @150% (the LG is
+# driven directly, so native 4K). Pass -Width/-Height/-Scale to override.
+if (-not $Width)  { $Width  = if ($Layout -eq 'lgonly') { 1920 } else { 3840 } }
+if (-not $Height) { $Height = if ($Layout -eq 'lgonly') { 1080 } else { 2160 } }
+if (-not $Scale)  { $Scale  = if ($Layout -eq 'lgonly') { 100 } else { 150 } }
 $ErrorActionPreference='Stop'
 $logFile='C:\Tools\display\display-layout.log'
 function Log($m){ Add-Content $logFile ("{0:yyyy-MM-dd HH:mm:ss} [{1}] {2}" -f (Get-Date),$Layout,$m) }

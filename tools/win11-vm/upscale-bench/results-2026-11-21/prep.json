@@ -1,0 +1,238 @@
+{
+ "scenes": {
+  "boat": [
+   "walk-1080.mp4",
+   2.0
+  ],
+  "road": [
+   "walk-11100.mp4",
+   6.0
+  ],
+  "map": [
+   "walk-11100.mp4",
+   1.0
+  ],
+  "bar": [
+   "walk-13800.mp4",
+   8.0
+  ],
+  "docks": [
+   "walk-8400.mp4",
+   6.0
+  ],
+  "interior": [
+   "walk-5700.mp4",
+   2.0
+  ],
+  "closeup": [
+   "walk-3120.mp4",
+   6.0
+  ],
+  "trailer": [
+   "trailer2-0100.mp4",
+   4.0
+  ]
+ },
+ "variants": [
+  "raw",
+  "hevc15",
+  "h264_15",
+  "hevc8"
+ ],
+ "scalers": [
+  "bilinear",
+  "bicubic",
+  "lanczos"
+ ],
+ "nf": 8,
+ "encoders": {
+  "hevc15": [
+   "-c:v",
+   "hevc_nvenc",
+   "-b:v",
+   "15M",
+   "-maxrate",
+   "15M",
+   "-preset",
+   "p4",
+   "-tune",
+   "ll",
+   "-rc",
+   "cbr",
+   "-bf",
+   "0",
+   "-g",
+   "600",
+   "-bufsize",
+   "1M",
+   "-delay",
+   "0",
+   "-zerolatency",
+   "1"
+  ],
+  "h264_15": [
+   "-c:v",
+   "h264_nvenc",
+   "-b:v",
+   "15M",
+   "-maxrate",
+   "15M",
+   "-profile:v",
+   "high",
+   "-preset",
+   "p4",
+   "-tune",
+   "ll",
+   "-rc",
+   "cbr",
+   "-bf",
+   "0",
+   "-g",
+   "600",
+   "-bufsize",
+   "1M",
+   "-delay",
+   "0",
+   "-zerolatency",
+   "1"
+  ],
+  "hevc8": [
+   "-c:v",
+   "hevc_nvenc",
+   "-b:v",
+   "8M",
+   "-maxrate",
+   "8M",
+   "-preset",
+   "p4",
+   "-tune",
+   "ll",
+   "-rc",
+   "cbr",
+   "-bf",
+   "0",
+   "-g",
+   "600",
+   "-bufsize",
+   "1M",
+   "-delay",
+   "0",
+   "-zerolatency",
+   "1"
+  ]
+ },
+ "bitrates": {
+  "trailer2-0100.mp4:raw": {
+   "duration": "20.000000",
+   "bit_rate": "180747427"
+  },
+  "trailer2-0100.mp4:hevc15": {
+   "duration": "20.000000",
+   "bit_rate": "11967254"
+  },
+  "trailer2-0100.mp4:h264_15": {
+   "duration": "20.000000",
+   "bit_rate": "15004327"
+  },
+  "trailer2-0100.mp4:hevc8": {
+   "duration": "20.000000",
+   "bit_rate": "7076414"
+  },
+  "walk-1080.mp4:raw": {
+   "duration": "12.000000",
+   "bit_rate": "273486951"
+  },
+  "walk-1080.mp4:hevc15": {
+   "duration": "12.000000",
+   "bit_rate": "14815249"
+  },
+  "walk-1080.mp4:h264_15": {
+   "duration": "12.000000",
+   "bit_rate": "15021425"
+  },
+  "walk-1080.mp4:hevc8": {
+   "duration": "12.000000",
+   "bit_rate": "8008477"
+  },
+  "walk-11100.mp4:raw": {
+   "duration": "12.000000",
+   "bit_rate": "361737722"
+  },
+  "walk-11100.mp4:hevc15": {
+   "duration": "12.000000",
+   "bit_rate": "12895619"
+  },
+  "walk-11100.mp4:h264_15": {
+   "duration": "12.000000",
+   "bit_rate": "15029972"
+  },
+  "walk-11100.mp4:hevc8": {
+   "duration": "12.000000",
+   "bit_rate": "7155439"
+  },
+  "walk-13800.mp4:raw": {
+   "duration": "12.000000",
+   "bit_rate": "218439368"
+  },
+  "walk-13800.mp4:hevc15": {
+   "duration": "12.000000",
+   "bit_rate": "13761666"
+  },
+  "walk-13800.mp4:h264_15": {
+   "duration": "12.000000",
+   "bit_rate": "15038498"
+  },
+  "walk-13800.mp4:hevc8": {
+   "duration": "12.000000",
+   "bit_rate": "7965165"
+  },
+  "walk-3120.mp4:raw": {
+   "duration": "12.000000",
+   "bit_rate": "221800107"
+  },
+  "walk-3120.mp4:hevc15": {
+   "duration": "12.000000",
+   "bit_rate": "11703646"
+  },
+  "walk-3120.mp4:h264_15": {
+   "duration": "12.000000",
+   "bit_rate": "15004712"
+  },
+  "walk-3120.mp4:hevc8": {
+   "duration": "12.000000",
+   "bit_rate": "7675968"
+  },
+  "walk-5700.mp4:raw": {
+   "duration": "12.000000",
+   "bit_rate": "123002492"
+  },
+  "walk-5700.mp4:hevc15": {
+   "duration": "12.000000",
+   "bit_rate": "12747723"
+  },
+  "walk-5700.mp4:h264_15": {
+   "duration": "12.000000",
+   "bit_rate": "15030066"
+  },
+  "walk-5700.mp4:hevc8": {
+   "duration": "12.000000",
+   "bit_rate": "7466328"
+  },
+  "walk-8400.mp4:raw": {
+   "duration": "12.000000",
+   "bit_rate": "314315863"
+  },
+  "walk-8400.mp4:hevc15": {
+   "duration": "12.000000",
+   "bit_rate": "14462512"
+  },
+  "walk-8400.mp4:h264_15": {
+   "duration": "12.000000",
+   "bit_rate": "15005758"
+  },
+  "walk-8400.mp4:hevc8": {
+   "duration": "12.000000",
+   "bit_rate": "7944714"
+  }
+ }
+}

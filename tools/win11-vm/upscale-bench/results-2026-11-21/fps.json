@@ -1,0 +1,178 @@
+{
+ "rec_s": 15,
+ "runs": {
+  "1080p-linear": {
+   "player": "opened 1920x1080 22:01:53",
+   "client_overlay": {
+    "samples": [
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      59.89,
+      59.89
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      59.88,
+      59.88
+     ],
+     [
+      59.88,
+      59.88
+     ]
+    ],
+    "ocr_fail": 0,
+    "ups_mean": 59.88,
+    "ups_min": 59.88,
+    "fps_mean": 61.21
+   },
+   "shm": {
+    "recorded_frames": 947,
+    "no_barcode": 0,
+    "unique_fps": 56.58,
+    "new_frames_per_s": 56.58,
+    "duplicates_pct": 5.71,
+    "skipped_video_frames": 55,
+    "longest_freeze_ms": 50.0,
+    "median_second_new": 56.0,
+    "worst_second_new": 55,
+    "file": "1080p-linear-shm.mkv 1920,1080,60/1,60/1"
+   }
+  },
+  "1080p-fsr1.0": {
+   "player": "opened 1920x1080 22:02:35",
+   "client_overlay": {
+    "samples": [
+     [
+      61.88,
+      59.88
+     ],
+     [
+      59.88,
+      59.88
+     ],
+     [
+      57.89,
+      57.89
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ],
+     [
+      61.88,
+      59.88
+     ]
+    ],
+    "ocr_fail": 0,
+    "ups_mean": 59.63,
+    "ups_min": 57.89,
+    "fps_mean": 61.13
+   },
+   "shm": {
+    "recorded_frames": 932,
+    "no_barcode": 0,
+    "unique_fps": 53.43,
+    "new_frames_per_s": 53.43,
+    "duplicates_pct": 10.96,
+    "skipped_video_frames": 104,
+    "longest_freeze_ms": 33.3,
+    "median_second_new": 54.0,
+    "worst_second_new": 50,
+    "file": "1080p-fsr1.0-shm.mkv 1920,1080,60/1,60/1"
+   }
+  },
+  "4k-linear": {
+   "player": "opened 1920x1080 22:03:35",
+   "client_overlay": {
+    "samples": [
+     [
+      61.88,
+      59.88
+     ],
+     [
+      57.89,
+      57.89
+     ],
+     [
+      57.89,
+      57.89
+     ],
+     [
+      59.88,
+      57.89
+     ],
+     [
+      57.89,
+      55.89
+     ],
+     [
+      61.88,
+      61.88
+     ],
+     [
+      57.89,
+      57.89
+     ],
+     [
+      59.88,
+      59.88
+     ],
+     [
+      57.89,
+      57.89
+     ]
+    ],
+    "ocr_fail": 0,
+    "ups_mean": 58.55,
+    "ups_min": 55.89,
+    "fps_mean": 59.22
+   },
+   "shm": {
+    "recorded_frames": 996,
+    "no_barcode": 0,
+    "unique_fps": 53.37,
+    "new_frames_per_s": 53.37,
+    "duplicates_pct": 11.06,
+    "skipped_video_frames": 110,
+    "longest_freeze_ms": 50.0,
+    "median_second_new": 54.0,
+    "worst_second_new": 50,
+    "file": "4k-linear-shm.mkv 1920,1080,60/1,60/1"
+   }
+  }
+ }
+}

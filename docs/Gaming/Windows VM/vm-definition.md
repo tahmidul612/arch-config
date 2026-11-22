@@ -145,7 +145,7 @@ The SPICE audio backend was replaced by QEMU's PipeWire backend. The XML is belo
 </shmem>
 ```
 
-The size depends on the guest's desktop resolution: 64 MiB fits 2560x1440, and the native 3840x2160 desktop needs 128 MiB. After a size change, run `truncate -s 0 /dev/shm/looking-glass` before the next start. The host file and the guest side are on [Display](display.md#looking-glass).
+The size depends on the guest's desktop resolution: 64 MiB fits 2560x1440, and 3840x2160 needs 128 MiB. lg mode now runs the guest at 1920x1080, but hdmi mode extends the virtual monitor at 3840x2160, so 128 MiB stays. After a size change, run `truncate -s 0 /dev/shm/looking-glass` before the next start. The host file and the guest side are on [Display](display.md#looking-glass).
 
 ## Restarting so changes apply
 

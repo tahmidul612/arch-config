@@ -25,7 +25,7 @@ Benchmarks: Edge in the guest looping a 1080p60 25 Mbps test clip, which is clos
 
     | Setting | Value |
     | --- | --- |
-    | Canvas | 3840x2160 (the guest's mode) |
+    | Canvas | 1920x1080, lg mode's guest mode (until 2026-11-21: 3840x2160). The source is scaled to fit, so a 4K guest (hdmi mode, test runs) still fills it |
     | Output | 1920x1080 at 60 fps, Lanczos. Remote Play itself streams at most 1080p, so a 4K file would only be bigger |
     | Video | NVENC HEVC (`obs_nvenc_hevc_tex`), CQP 18, preset p5, tune hq, 2 B-frames, keyframe every 2 s |
     | Audio | AAC 320 kb/s, one track "VM audio" |

@@ -1,0 +1,50 @@
+{
+ "clip": "play-h264_15.mp4",
+ "sample_s": 15,
+ "runs": {
+  "1080p/linear": {
+   "player": "opened 1920x1080 21:06:35",
+   "moving": true,
+   "gpu_util_pct": 36.46666666666667,
+   "gpu_power_w": 95.67413333333334,
+   "client_cpu_pct_of_one_core": 6.333242131592891,
+   "igpu_3d_pct": 42.20243514760459,
+   "cores": 8,
+   "guest_cpu_pct": 8.295477517294012,
+   "igpu_decode_pct": 9.009326382911663
+  },
+  "1080p/fsr1.0": {
+   "player": "opened 1920x1080 21:07:18",
+   "moving": true,
+   "gpu_util_pct": 37.333333333333336,
+   "gpu_power_w": 99.51753333333335,
+   "client_cpu_pct_of_one_core": 6.466596979256441,
+   "igpu_3d_pct": 41.12883933280963,
+   "cores": 8,
+   "guest_cpu_pct": 7.490815628045598,
+   "igpu_decode_pct": 8.849157394479148
+  },
+  "1080p/fsr1.0+cas0.5": {
+   "player": "opened 1920x1080 21:08:01",
+   "moving": true,
+   "gpu_util_pct": 37.81333333333333,
+   "gpu_power_w": 99.9638,
+   "client_cpu_pct_of_one_core": 6.599906951308796,
+   "igpu_3d_pct": 41.55802165918831,
+   "cores": 8,
+   "guest_cpu_pct": 8.124141502815485,
+   "igpu_decode_pct": 8.917048872728405
+  },
+  "4k/linear": {
+   "player": "opened 1920x1080 21:09:06",
+   "moving": true,
+   "gpu_util_pct": 36.806666666666665,
+   "gpu_power_w": 96.46906666666665,
+   "client_cpu_pct_of_one_core": 19.733066418337476,
+   "igpu_3d_pct": 78.65832547803214,
+   "cores": 8,
+   "guest_cpu_pct": 8.81097204043493,
+   "igpu_decode_pct": 5.713988799492328
+  }
+ }
+}
