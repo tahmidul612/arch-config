@@ -18,7 +18,7 @@ To make that playable, the VM gets:
                      = USB DualShock 4  ------------------->   |
  Deskflow server  <--- TCP 24800, TLS, virbr0 ------------  Deskflow client (service)
  PipeWire  <------ QEMU pipewire audio "win11" -----------  ich9 sound
- guest-ps.py / qga-*.py --- qemu-guest-agent ------------>  PowerShell, file copy
+ qga exec / push / pull ---- qemu-guest-agent ----------->  PowerShell, file copy
  vfio-pci: UHD 770 00:02.0  ============================>  Intel UHD 770 (decode, display)
                                                               -> HDMI to the monitor, or
  looking-glass-client  <=== /dev/shm/looking-glass =======     Looking Glass virtual display

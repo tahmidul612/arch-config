@@ -1,0 +1,10 @@
+# Early warning: alert (desktop + KDE Connect) if any app has been pinned at >= 80% of a
+# core for 3 h straight. The weekly email is too late for that.
+[Unit]
+Description=resmon stuck-process check
+
+[Service]
+Type=oneshot
+Nice=19
+TimeoutStartSec=2min
+ExecStart=%h/.local/bin/resmon watch --hours 3 --min-cpu 80

@@ -90,7 +90,7 @@ The backups must be dumped with `--security-info`, or the restore drops the VNC 
 
 ## Guest
 
-Run as administrator in the guest (or through `guest-ps.py`).
+Run as administrator in the guest (or through `qga exec`).
 
 === "Remote Play"
 

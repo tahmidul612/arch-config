@@ -1,0 +1,28 @@
+[workspace]
+resolver = "3"
+members = ["resmon", "win11-vm/qga"]
+exclude = ["win11-vm/launcher", "win11-vm/ds4-bench/ds4rs"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Unit conversions (kB -> GB, ticks -> %) are everywhere; the values are far inside f64's exact range.
+cast_precision_loss = "allow"
+# Report code reads better with short names for the period, samples and table cells.
+many_single_char_names = "allow"
+similar_names = "allow"
+# Doc comments here are prose for a binary, not rendered API docs.
+doc_markdown = "allow"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

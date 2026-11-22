@@ -11,9 +11,7 @@ Nothing here contains secrets. Where a file needs a user, host or path from your
 | `host-setup.sh` | `/etc/default/grub`, `/etc/modprobe.d/vfio-igpu.conf`, `/etc/mkinitcpio.conf.d/20-vfio-igpu.conf`, `/usr/local/share/vfio/` | `sudo ./host-setup.sh`, reboot | Default |
 | `host-rollback.sh` | removes the above, restores GRUB | `sudo ./host-rollback.sh`, reboot | Default |
 | `xml/win11.xml` | `virsh define` (after filling in placeholders) | see vm-definition.md | Default (reference) |
-| `guest-ps.py` | run from here | `./guest-ps.py [timeout] <<'EOF' … EOF` | Default |
-| `qga-push.py` | run from here (needs `python-libvirt`) | `./qga-push.py <host file> <guest path>` | Default |
-| `qga-pull.py` | run from here | `./qga-pull.py <guest path> <host file>` | Default |
+| `qga/` (Rust) | `~/.local/bin/qga` | `cargo build --release --manifest-path ../Cargo.toml -p qga`, then `install -Dm755 -t ~/.local/bin ../target/release/qga` (`tools/resmon/install.sh` does both). Usage: `qga exec [timeout] <<'EOF' … EOF`, `qga push <host file> <guest path>`, `qga pull <guest path> <host file>` | Default |
 | `guest/idle-shutdown.ps1` | guest `C:\Tools\idle-shutdown\` | scheduled task `IdleShutdown`, see windows-guest.md | Default |
 | `vm-audio-acl.service` | `~/.config/systemd/user/` | `systemctl --user enable --now vm-audio-acl` | Default |
 | `win11-audio-sink.service` | `~/.config/systemd/user/` | `systemctl --user enable --now win11-audio-sink` | Default (needed for host recording) |
@@ -48,12 +46,12 @@ These files were first written and run on the machine during setup. The repo cop
 
 - `host-setup.sh` downloads the iGPU ROM from the [LongQT-sea/intel-igpu-passthru v0.1 release](https://github.com/LongQT-sea/intel-igpu-passthru/releases/tag/v0.1) and checks its sha256 (the original copied a local file with the same hash). It backs up GRUB to `/etc/default/grub.pre-vfio-igpu` instead of next to the script, and `host-rollback.sh` reads it from there.
 - `ds4-host-prep.sh` (originally `host-prep.sh`) gives `/dev/raw-gadget` to `$SUDO_USER` instead of a fixed user name.
-- `guest-ps.py`, `qga-push.py`, `qga-pull.py`, `ds4-vm.py` and `xbox-vm-attach` read the domain name from `VM`.
+- `qga` (or its `--vm` flag), `ds4-vm.py` and `xbox-vm-attach` read the domain name from `VM`.
 - `display-layout.ps1`, `client.ini` and the OBS profile were changed on 2026-11-21 for the 1080p guest (lgonly defaults, FSR, 1920x1080 canvas) and installed in the guest, `~/.config/looking-glass/` and the running OBS.
 - `ds4-vm.py` was changed after it ran: it uses `python-libvirt` instead of spawning `virsh` (idle CPU went from about 1.2% of a core to under 0.1%), and `ds4gadget.py` closes the pad's device when it is unplugged. Both copies were installed and the attach/detach checked on 2026-11-21.
 - `deskflow/` holds templates of the configs the setup produced; `make-certs.sh` repeats the certificate commands that were run by hand.
 - `xml/win11.xml` has no UUID, MAC or VNC password, and placeholders for the disk, ISO and runtime directory.
-- `looking-glass/vm-display` and `vm-rec` find `guest-ps.py`, the KWin script and `obsws.py` relative to their own (symlink-resolved) location instead of a backup folder, and `vm-display` reads `VM`. `client.ini` has since been changed: FSR 1 on, `lgmp:shmDevice` instead of `app:shmFile`, comment for the 1080p guest.
+- `looking-glass/vm-display` and `vm-rec` find the KWin script and `obsws.py` relative to their own (symlink-resolved) location instead of a backup folder. `vm-display` runs guest commands through `qga` (from `PATH`, else `~/.local/bin`) and reads `VM`. `client.ini` has since been changed: FSR 1 on, `lgmp:shmDevice` instead of `app:shmFile`, comment for the 1080p guest.
 - `monitor-input/lg-input` reads `VM`, and its stand-down marker is described generically.
 - `.desktop` files, the tmpfiles rule and the OBS profile have `<USER>` / `<RECORDINGS_DIR>` placeholders; the OBS profile lost two machine-specific lines (`FFFilePath`, `CookieId`).
 - The display XML is the same for lg and hdmi mode (they differ only inside Windows), so there is one `xml/win11.xml`.

@@ -1,0 +1,13 @@
+[Unit]
+Description=resmon CPU/RAM/GPU usage logger
+After=default.target
+
+[Service]
+ExecStart=%h/.local/bin/resmon collect --interval 30
+Restart=always
+RestartSec=30
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=default.target

@@ -53,13 +53,13 @@ The service is reading its own `systemprofile\AppData\Roaming\Deskflow\Deskflow.
 
 Windows opens an `ms-gamebar:` link when a controller arrives or its Guide (PS) button is pressed, even though the Xbox Game Bar app isn't installed, so it shows the Open-With dialog every time the virtual DS4 attaches. Run [`no-gamebar-popup.ps1`](windows-guest.md#game-bar-and-the-ps-button): it turns the controller shortcut off and registers do-nothing handlers for the three Game Bar links.
 
-### `guest-ps.py` fails with "Unable to encode message payload"
+### `qga exec` fails with "Unable to encode message payload"
 
-The script is too big for one `guest-exec` call. Upload it with `qga-push.py` and run the file.
+The script is too big for one `guest-exec` call. Upload it with `qga push` and run the file.
 
 ### A file in the guest stays locked ("being used by another process")
 
-A `guest-file-write` with too large a chunk hung the agent and leaked the handle. Use a new file name, or reboot the guest. `qga-push.py` uses 64 KiB chunks for this reason.
+A `guest-file-write` with too large a chunk hung the agent and leaked the handle. Use a new file name, or reboot the guest. `qga push` uses 64 KiB chunks for this reason.
 
 ### No sound from the VM
 

@@ -1,0 +1,11 @@
+# Persistent=true: a push missed while the PC was off runs at the next boot.
+[Unit]
+Description=Monthly resmon review push (1st of the month)
+
+[Timer]
+OnCalendar=*-*-01 07:20:00
+Persistent=true
+Unit=resmon-push@month.service
+
+[Install]
+WantedBy=timers.target

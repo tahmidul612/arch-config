@@ -1,0 +1,21 @@
+[package]
+name = "resmon"
+version = "0.2.0"
+description = "Long-running CPU / RAM / GPU usage logger with attribution reports"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.9", features = ["derive", "env"] }
+jiff = "1.0.2"
+nvml-wrapper = "0.13.0"
+rusqlite = "0.43.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+signal-hook = "0.4.6"
+ureq = { version = "3.5.2", features = ["json"] }

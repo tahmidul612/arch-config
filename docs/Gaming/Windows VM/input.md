@@ -66,7 +66,7 @@ Without `vm-display` (no Looking Glass), start it with `kioclient exec /usr/shar
 
 ### 3. Guest (client)
 
-Run as administrator in the guest, or through [`guest-ps.py`](windows-guest.md#running-commands-in-the-guest):
+Run as administrator in the guest, or through [`qga exec`](windows-guest.md#running-commands-in-the-guest):
 
 ```powershell
 $d = 'C:\Users\Public\Downloads\deskflow'; New-Item -ItemType Directory -Force $d | Out-Null

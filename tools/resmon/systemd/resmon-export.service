@@ -1,0 +1,14 @@
+[Unit]
+Description=resmon summary export
+
+[Service]
+Type=oneshot
+Nice=19
+IOSchedulingClass=idle
+# Guards: a normal export takes about a second. Oneshot units have no start timeout by
+# default, and a runaway export once held a read snapshot for days, pinning a core and
+# growing the WAL to 12 GB. Kill it instead.
+TimeoutStartSec=15min
+CPUQuota=50%
+MemoryMax=2G
+ExecStart=%h/.local/bin/resmon export
