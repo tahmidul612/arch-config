@@ -83,13 +83,20 @@ Sign in with the PSN account and connect to the console over the internet as usu
 
 ### Game Bar and the PS button
 
-The PS button on the [virtual DualShock 4](input.md#virtual-dualshock-4) is the Xbox/Guide button, and Game Bar grabs it. It was turned off for the Windows user:
+The PS button on the [virtual DualShock 4](input.md#virtual-dualshock-4) is the Xbox/Guide button, and Windows hands it to Game Bar. The Xbox Game Bar app is not installed in this guest, so each time the DS4 attached (every time Remote Play opened) Windows showed "Get an app to open this 'ms-gamebar' link". [`no-gamebar-popup.ps1`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/guest/no-gamebar-popup.ps1) stops it in two ways:
 
-```powershell
-reg add HKCU\Software\Microsoft\GameBar /v UseNexusForGameBarEnabled /t REG_DWORD /d 0 /f
+- it sets `UseNexusForGameBarEnabled = 0` for the Windows user ("Open Game Bar using this button on a controller" off);
+- it registers do-nothing handlers for the `ms-gamebar`, `ms-gamebarservices` and `ms-gamingoverlay` links under `HKLM\SOFTWARE\Classes`, pointing at `systray.exe`, which exits at once. Any other trigger then opens nothing instead of the Open-With dialog.
+
+What it does: removes the popup. Why both: an earlier fix set only the first value, and on 2026-11-22 the guest had it back at 1 with the popup showing. Install and run it through the guest agent (it runs as SYSTEM and finds the user from the `Display-lgonly` task, or pass `-User`):
+
+```bash
+./guest-ps.py <<<'New-Item -ItemType Directory C:\Tools\controller -Force | Out-Null'
+./qga-push.py guest/no-gamebar-popup.ps1 'C:\Tools\controller\no-gamebar-popup.ps1'
+./guest-ps.py <<<'& C:\Tools\controller\no-gamebar-popup.ps1'
 ```
 
-Run this as the Windows user (through `guest-ps.py`, write it under `HKU\<SID>` instead). Whether it changed anything was never checked.
+Check it: the script prints `UseNexusForGameBarEnabled=0` and `True` for the three links. Opening `ms-gamebar://` in the user's session (`cmd /c start "" ms-gamebar://` from a task that runs as that user) then starts no `OpenWith` process, the process behind the dialog. Undo with `no-gamebar-popup.ps1 -Undo`. Tested on 2026-11-22: without the fix that link opened `OpenWith`, with it nothing; the DS4 re-attaching afterwards showed no dialog either. Not yet watched on screen over several sessions.
 
 ## Idle shutdown
 

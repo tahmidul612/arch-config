@@ -47,7 +47,11 @@ The service is reading its own `systemprofile\AppData\Roaming\Deskflow\Deskflow.
 - `lsmod | grep -E 'dummy_hcd|raw_gadget'` after a reboot; if empty, run `ds4-modules-setup.sh`.
 - If you run the gadget by hand, detach and attach again after any restart; a stale hostdev entry points at the old USB address.
 - On the console, press PS and choose the user at "Who's using this controller?".
-- The PS button (Xbox Guide) opens Game Bar instead: set `UseNexusForGameBarEnabled=0` ([Windows guest](windows-guest.md#game-bar-and-the-ps-button)).
+- The PS button (Xbox Guide) opens Game Bar instead: run `no-gamebar-popup.ps1` ([Windows guest](windows-guest.md#game-bar-and-the-ps-button)).
+
+### "Get an app to open this 'ms-gamebar' link" when the controller connects
+
+Windows opens an `ms-gamebar:` link when a controller arrives or its Guide (PS) button is pressed, even though the Xbox Game Bar app isn't installed, so it shows the Open-With dialog every time the virtual DS4 attaches. Run [`no-gamebar-popup.ps1`](windows-guest.md#game-bar-and-the-ps-button): it turns the controller shortcut off and registers do-nothing handlers for the three Game Bar links.
 
 ### `guest-ps.py` fails with "Unable to encode message payload"
 
