@@ -32,10 +32,10 @@ PS
   log "guest layout $1: $(echo "$out" | tr '\n' ' ')"
   echo "$out" | grep -q '^result=0' || [ "$1" = status ]
 }
-client_stop(){ systemctl --user stop lg-client.service 2>/dev/null; pkill -f /usr/bin/looking-glass-client 2>/dev/null; true; }
+client_stop(){ systemctl --user stop lg-client.service 2>/dev/null; pkill -x looking-glass-c 2>/dev/null; true; }   # the client renames its process title, so match comm, not -f
 client_start(){
   client_stop
-  systemd-run --user --unit=lg-client --collect -p Restart=on-failure -p RestartSec=3 looking-glass-client >/dev/null
+  systemd-run --user --unit=lg-client --collect -p Restart=on-abnormal -p RestartSec=3 looking-glass-client >/dev/null   # on-abnormal: closing the window exits 255, which on-failure restarted; crashes (signals) still restart
   sleep 3   # let the client map its window (the script is run twice below in case it was slow)
   local id; id=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$KWIN_JS" vm-display-lg 2>/dev/null)
   if [ -n "$id" ]; then
