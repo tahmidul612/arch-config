@@ -136,6 +136,7 @@ What was tried and dropped, with the reason. None of these are steps to follow.
 | `ds4-vm.service` attaching the DS4 for as long as the VM runs | Superseded | Changed so other games and apps never see a DS4: now only while Remote Play runs. |
 | XI2DS, DS4Windows | Not tried | Same ViGEm limitation. |
 | Virtual DS4 on the host (`ds4gadget.py`) | **Used** | See [Input](input.md#virtual-dualshock-4). |
+| Rust rewrite of the virtual DS4 | Not adopted | Benchmarked against a Rust port: same latency (within 0.1 ms, median about 2.2 ms on the host), only CPU differs (0.1% vs 0.4%). See [Input](input.md#latency-python-vs-rust). |
 
 ### Keyboard, mouse and firewall
 

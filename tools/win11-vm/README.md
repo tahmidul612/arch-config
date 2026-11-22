@@ -22,7 +22,8 @@ Nothing here contains secrets. Where a file needs a user, host or path from your
 | `deskflow/make-certs.sh` | writes `./host/` and `./guest/` TLS files | run once, copy the results | Default |
 | `ds4-host-prep.sh` | `/etc/udev/rules.d/70-raw-gadget.rules`, loads `dummy_hcd` + `raw_gadget` | `sudo ./ds4-host-prep.sh` | Default |
 | `ds4-modules-setup.sh` | `/etc/modules-load.d/ds4-gadget.conf` | `./ds4-modules-setup.sh` (asks for sudo) | Default |
-| `ds4-vm.py`, `ds4gadget.py`, `ds4_report_desc.bin` | `~/.local/lib/ds4-vm/` | copy; `python3 ds4gadget.py [--log FILE] [--no-pad] [-v]` by hand | Default |
+| `ds4-vm.py`, `ds4gadget.py`, `ds4_report_desc.bin` | `~/.local/lib/ds4-vm/` (needs `python-evdev`, `python-libvirt`) | copy; `python3 ds4gadget.py [--log FILE] [--no-pad] [-v]` by hand | Default |
+| `ds4-bench/` | run from there | `./run-bench.sh`, see its README | Benchmark (Python vs Rust gadget latency) |
 | `ds4-vm.service` | `~/.config/systemd/user/` | `systemctl --user enable --now ds4-vm` | Default (tested by the setup session only) |
 | `looking-glass/lg-host-setup.sh` | AUR packages, `/etc/tmpfiles.d/10-looking-glass.conf` | `./lg-host-setup.sh` as your user | Default |
 | `looking-glass/10-looking-glass.conf` | `/etc/tmpfiles.d/` (written by the script) | reference | Default |
@@ -44,7 +45,8 @@ These files were first written and run on the machine during setup. The repo cop
 
 - `host-setup.sh` downloads the iGPU ROM from the [LongQT-sea/intel-igpu-passthru v0.1 release](https://github.com/LongQT-sea/intel-igpu-passthru/releases/tag/v0.1) and checks its sha256 (the original copied a local file with the same hash). It backs up GRUB to `/etc/default/grub.pre-vfio-igpu` instead of next to the script, and `host-rollback.sh` reads it from there.
 - `ds4-host-prep.sh` (originally `host-prep.sh`) gives `/dev/raw-gadget` to `$SUDO_USER` instead of a fixed user name.
-- `guest-ps.py`, `qga-push.py`, `qga-pull.py` and `xbox-vm-attach` read the domain name from `VM`.
+- `guest-ps.py`, `qga-push.py`, `qga-pull.py`, `ds4-vm.py` and `xbox-vm-attach` read the domain name from `VM`.
+- `ds4-vm.py` was changed after it ran: it uses `python-libvirt` instead of spawning `virsh` (idle CPU went from about 1.2% of a core to under 0.1%), and `ds4gadget.py` closes the pad's device when it is unplugged. Both copies were installed and the attach/detach checked on 2026-11-21.
 - `deskflow/` holds templates of the configs the setup produced; `make-certs.sh` repeats the certificate commands that were run by hand.
 - `xml/win11.xml` has no UUID, MAC or VNC password, and placeholders for the disk, ISO and runtime directory.
 - `looking-glass/vm-display` and `vm-rec` find `guest-ps.py`, the KWin script and `obsws.py` relative to their own (symlink-resolved) location instead of a backup folder, and `vm-display` reads `VM`. `client.ini`'s comment now says 4K.

@@ -124,7 +124,7 @@ sudo ./ds4-host-prep.sh          # udev rule for /dev/raw-gadget, loads the modu
 
 ### The service: DS4 while Remote Play runs
 
-[`ds4-vm.py`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-vm.py), run by the user unit [`ds4-vm.service`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-vm.service), asks the guest agent every 3 s whether `RemotePlay.exe` is running (`tasklist`):
+[`ds4-vm.py`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-vm.py), run by the user unit [`ds4-vm.service`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-vm.service), asks the guest agent every 3 s whether `RemotePlay.exe` is running (`tasklist`). It talks to libvirt through `python-libvirt` over one open connection, so the poll costs almost nothing on the host (spawning `virsh` for every check used about 1% of a core):
 
 - Remote Play running: it starts `ds4gadget.py` (restarted with back-off if it dies) and keeps exactly the current DS4 attached to the VM as a live USB hostdev. Stale entries from an earlier enumeration are detached, and it attaches again after a VM restart.
 - Remote Play closed for 15 s, or the VM stopped: it detaches the DS4 and stops the gadget. Other games and apps never see a DS4; the Xbox pad stays with the host.
@@ -145,6 +145,25 @@ Check: start Remote Play in the VM. Within a few seconds the journal shows the a
 Tested by the setup session, not yet in your own play: start and attach, Remote Play recognising it, detach when Remote Play closes, recovery when the hostdev is detached behind its back, and an emulator restart. Not tested: unplugging the Xbox pad during a session, a VM stop and start, and the first host reboot with the modules file.
 
 `systemctl --user stop ds4-vm` stops it. `ds4gadget.py -v` logs every button press.
+
+### Latency: Python vs Rust
+
+The gadget is Python, so it was checked whether a Rust rewrite would cut input latency. [`ds4-bench/`](https://github.com/tahmidul612/arch-config/blob/main/tools/win11-vm/ds4-bench/README.md) holds a Rust port with the same descriptors and the same send loop (build a report, blocking write, sleep 4 ms), and a harness that presses a button on a fake Xbox pad (`uinput`) 2000 times at random moments. It times each press up to the kernel timestamp of the event on the DS4 that the host's `hid-playstation` driver creates for the gadget.
+
+| Variant | Median | p95 | p99 | Max | Gadget CPU |
+| --- | --- | --- | --- | --- | --- |
+| Python (`ds4gadget.py`), 4 ms loop | 2.20 ms | 3.97 | 4.12 | 4.20 | 0.43% |
+| Rust, 4 ms loop | 2.11 ms | 3.94 | 4.11 | 6.06 | 0.08% |
+| Python, all 20 cores busy (`stress-ng`) | 2.27 ms | 4.04 | 4.20 | 5.82 | 0.51% |
+| Rust, all 20 cores busy | 2.27 ms | 3.95 | 4.12 | 5.35 | 0.08% |
+| Python, 1 ms loop | 0.61 ms | 1.10 | 1.16 | 1.21 | 0.84% |
+| Rust, 1 ms loop | 0.62 ms | 1.09 | 1.15 | 1.22 | 0.15% |
+
+Measured on 2026-11-21, no presses lost in any run. The two languages are within 0.1 ms of each other. Latency is spread evenly from 0 to about 4 ms, because a press waits for the next report, so the send interval sets it. A full CPU load didn't hurt Python either. Rust only saves CPU (0.1% against 0.4%), so the gadget stays in Python.
+
+The 1 ms loop is not used. The numbers cover the host side only: in the VM, Windows polls the DS4 every 5 ms (the endpoint's `bInterval`), and a faster host loop doesn't change that. Remote Play's own sampling, the video stream and the trip to the PS5 add tens of milliseconds on top, so 1-2 ms would not be felt. Polling faster would also need a different `bInterval`, which is untested with Remote Play.
+
+To repeat it, run `tools/win11-vm/ds4-bench/run-bench.sh` (about 5 minutes). It stops `ds4-vm.service` while it runs and starts it again afterwards.
 
 ### Manual fallback
 
@@ -187,5 +206,6 @@ sudo systemctl daemon-reload
 | `tools/win11-vm/ds4-modules-setup.sh` | `/etc/modules-load.d/ds4-gadget.conf` | Modules at boot |
 | `tools/win11-vm/ds4-vm.py`, `ds4gadget.py`, `ds4_report_desc.bin` | `~/.local/lib/ds4-vm/` | Supervisor and the virtual DS4 |
 | `tools/win11-vm/ds4-vm.service` | `~/.config/systemd/user/` | Runs the supervisor |
+| `tools/win11-vm/ds4-bench/` | run from the repo | Latency benchmark and the Rust port it compares against |
 | `tools/win11-vm/looking-glass/vm-display-deskflow.desktop` | `~/.config/autostart/` | Deskflow follows the display mode at login |
 | `tools/win11-vm/xbox-vm-attach*`, `99-xbox-vm-attach.rules` | `/usr/local/bin/`, `/etc/systemd/system/`, `/etc/udev/rules.d/` | Superseded Xbox hot-plug attach |

@@ -136,6 +136,8 @@ def pad_thread(no_pad):
                     log(f"pad: key {E.KEY.get(ev.code) or E.BTN.get(ev.code)} -> {BTN.get(ev.code, '(unmapped)')}")
         except OSError as e:
             neutral()                         # release everything so nothing stays "held" while unplugged
+            try: dev.close()                  # otherwise every unplug leaks the old device's fd
+            except OSError: pass
             log(f"pad: controller unplugged ({e}); neutral input, waiting for it to come back"); time.sleep(1)
 
 # ---------------------------------------------------------------- gadget

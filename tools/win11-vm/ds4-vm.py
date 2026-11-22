@@ -14,11 +14,13 @@ virtual DS4 to the VM as a libvirt USB hostdev.
                   Windows and Remote Play never see the DS4 disappear.
 
 Runs as the user service ds4-vm.service. Needs the dummy_hcd and raw_gadget modules
-(/etc/modules-load.d/ds4-gadget.conf) and /dev/raw-gadget owned by the user (70-raw-gadget.rules).
+(/etc/modules-load.d/ds4-gadget.conf), /dev/raw-gadget owned by the user (70-raw-gadget.rules)
+and python-libvirt.
 """
-import base64, json, os, signal, subprocess, sys, tempfile, time, xml.etree.ElementTree as ET
+import base64, json, os, signal, subprocess, sys, time, xml.etree.ElementTree as ET
+import libvirt, libvirt_qemu
 
-VM, URI = "win11", "qemu:///system"
+VM, URI = os.environ.get("VM", "win11"), "qemu:///system"
 VID, PID = "054c", "05c4"
 HERE = os.path.dirname(os.path.abspath(__file__))
 GADGET = [sys.executable, "-u", os.path.join(HERE, "ds4gadget.py")]
@@ -29,17 +31,32 @@ RP_EXE = "RemotePlay.exe"
 def log(msg):
     print(f"{time.strftime('%H:%M:%S')} ds4-vm: {msg}", flush=True)
 
-def virsh(*args):
-    return subprocess.run(["virsh", "-c", URI, *args], capture_output=True, text=True)
+# One libvirt connection for the whole run (spawning virsh several times per poll cost ~1% CPU).
+libvirt.registerErrorHandler(lambda *a: None, None)
+_conn = None
+def dom():
+    """The VM's domain handle, or None if libvirtd or the domain isn't there."""
+    global _conn
+    try:
+        if _conn is None or not _conn.isAlive():
+            _conn = libvirt.open(URI)
+        return _conn.lookupByName(VM)
+    except libvirt.libvirtError:
+        _conn = None
+        return None
 
 def vm_running():
-    return virsh("domstate", VM).stdout.strip() == "running"
+    d = dom()
+    try:
+        return bool(d and d.state()[0] == libvirt.VIR_DOMAIN_RUNNING)
+    except libvirt.libvirtError:
+        return False
 
 def qga(cmd, timeout=5):
-    r = virsh("qemu-agent-command", VM, json.dumps(cmd), "--timeout", str(timeout))
-    if r.returncode:
-        raise RuntimeError((r.stderr or r.stdout).strip())
-    return json.loads(r.stdout)["return"]
+    d = dom()
+    if d is None:
+        raise RuntimeError("VM not found")
+    return json.loads(libvirt_qemu.qemuAgentCommand(d, json.dumps(cmd), timeout, 0))["return"]
 
 def rp_running():
     """True if RemotePlay.exe runs in the guest; None if the guest agent can't be asked (booting, busy)."""
@@ -76,11 +93,15 @@ def hostdev_xml(bus, dev):
 
 def attached_entries():
     """(bus, dev) of every DS4 hostdev in the VM's live XML."""
-    r = virsh("dumpxml", VM)
-    if r.returncode:
+    d = dom()
+    try:
+        xml = d.XMLDesc(0) if d else None
+    except libvirt.libvirtError:
+        xml = None
+    if not xml:
         return []
     out = []
-    for hd in ET.fromstring(r.stdout).findall("./devices/hostdev[@type='usb']"):
+    for hd in ET.fromstring(xml).findall("./devices/hostdev[@type='usb']"):
         src = hd.find("source")
         v, p, a = src.find("vendor"), src.find("product"), src.find("address")
         if v is None or p is None or a is None:
@@ -90,14 +111,17 @@ def attached_entries():
     return out
 
 def apply(action, xml):
-    with tempfile.NamedTemporaryFile("w", suffix=".xml", dir=os.environ.get("XDG_RUNTIME_DIR"), delete=False) as f:
-        f.write(xml)
+    """attach-device / detach-device on the running VM (live only, like virsh --live)."""
+    d = dom()
     try:
-        r = virsh(action, VM, f.name, "--live")
-        log(f"{action}: {(r.stdout + r.stderr).strip()}")
-        return r.returncode == 0
-    finally:
-        os.unlink(f.name)
+        if d is None:
+            raise libvirt.libvirtError("VM not found")
+        (d.attachDeviceFlags if action == "attach-device" else d.detachDeviceFlags)(xml, libvirt.VIR_DOMAIN_AFFECT_LIVE)
+        log(f"{action}: done")
+        return True
+    except libvirt.libvirtError as e:
+        log(f"{action}: {e}")
+        return False
 
 def sync_hostdev():
     """Make the VM hold exactly the current virtual DS4."""
@@ -180,7 +204,7 @@ class Supervisor:
                         for e in attached_entries():
                             apply("detach-device", hostdev_xml(*e))
                     self.stop_gadget("Remote Play closed" if running else "VM not running")
-            except Exception as e:                       # never die on a glitch (virsh hiccup, sysfs race)
+            except Exception as e:                       # never die on a glitch (libvirt hiccup, sysfs race)
                 log(f"error: {e!r}")
             time.sleep(POLL)
 
