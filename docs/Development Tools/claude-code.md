@@ -46,7 +46,7 @@ Three `PreToolUse` hooks keep secrets out of the conversation without blocking n
 | --- | --- | --- |
 | `ssh-read-guard.sh` | `Read\|Grep` | Anything under `~/.ssh` except `config`, `known_hosts`, `authorized_keys` and `*.pub` |
 | `env-secret-guard.py` | `Read\|Grep\|Write\|Edit` | `.env` files that hold real-looking secrets, and writes of secrets into them. Placeholder-only files such as `.env.example` stay readable |
-| `bash-secret-guard.py` | `Bash` | Shell commands that would print or copy those files. Commands that only *use* them are allowed (`ssh -i`, `docker --env-file`). It asks before `cp`/`mv`/`rm`/`git` on a secret-holding `.env` |
+| `bash-secret-guard.py` | `Bash` | Shell commands that would print or copy those files. Commands that only *use* them are allowed (`ssh -i`, `docker --env-file`). It asks before `cp`/`mv`/`rm`/`git` on a secret-holding `.env`. Recursive searches pass when `--include`/`--exclude`/`-g` filters keep those files out or only names and counts are printed (`-l`, `-c`); heredoc bodies are treated as data, not shell |
 
 Each hook has `"onFailure": "block"`:
 
