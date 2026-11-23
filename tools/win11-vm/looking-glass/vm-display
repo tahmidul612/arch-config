@@ -73,7 +73,13 @@ Start-ScheduledTask Display-$1; Start-Sleep 9; Get-Content C:\Tools\display\last
 PS
 )
   log "guest layout $1: $(echo "$out" | tr '\n' ' ')"
-  echo "$out" | grep -q '^result=0' || [ "$1" = status ]
+  [ "$1" = status ] && return 0
+  echo "$out" | grep -q '^result=0' || return 1
+  # display-layout.ps1 falls back to the Looking Glass monitor alone (and still says result=0) when Windows
+  # can't see the LG on HDMI; for the hdmi layout that is a failure
+  if [ "$1" = hdmi ] && ! echo "$out" | grep -q '^LG HDR'; then
+    log "Windows does not see the LG on HDMI"; return 4
+  fi
 }
 client_stop(){ systemctl --user stop lg-client.service 2>/dev/null; pkill -x looking-glass-c 2>/dev/null; true; }   # the client renames its process title, so match comm, not -f
 client_start(){
@@ -135,7 +141,15 @@ to_hdmi(){  # $1 = noswitch: leave the LG on the host
   vm_running || { log "VM not running"; notify "VM is not running"; step layout fail "VM not running"; return 1; }
   client_stop
   step layout run hdmi
-  if ! guest_layout hdmi; then log "guest hdmi layout failed -> back to lg"; step layout fail "back to Looking Glass"; LAUNCH="" to_lg; return 1; fi
+  guest_layout hdmi; local r=$?
+  if [ $r -ne 0 ]; then
+    log "guest hdmi layout failed -> back to lg"
+    if [ $r -eq 4 ]; then
+      step layout fail "Windows can't see the LG on HDMI: wake the LG's HDMI input (joystick > Input > HDMI), then retry"
+      notify "Windows can't see the LG on HDMI; staying on Looking Glass"
+    else step layout fail "back to Looking Glass"; fi
+    LAUNCH="" to_lg; return 1
+  fi
   step layout ok hdmi
   echo hdmi > "$STATE/mode"
   step deskflow run
