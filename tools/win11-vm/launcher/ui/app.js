@@ -243,6 +243,7 @@ function showSteps(opts) {
   }).join("");
   $("#sidelabel").textContent = "Launch";
   const from = $("#stats"), to = ol;
+  gsap.set(to, { autoAlpha: 1, x: 0 });   // a previous showStats() faded the list itself out
   gsap.timeline()
     .to(from, { autoAlpha: 0, x: -8, duration: 0.14, ease: "power2.in" })
     .add(() => { from.hidden = true; to.hidden = false; })
