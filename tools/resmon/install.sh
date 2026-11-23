@@ -27,11 +27,6 @@ install -Dm755 -t "$BIN_DIR" "$DIR/../target/release/resmon" "$DIR/../target/rel
 mkdir -p "$UNIT_DIR"
 install -m644 -t "$UNIT_DIR" "$DIR"/systemd/*
 
-# Exports used to be written next to the Python script.
-if [[ -d "$DIR/exports" && ! -e "$DATA_DIR/exports" ]]; then
-  mkdir -p "$DATA_DIR" && mv "$DIR/exports" "$DATA_DIR/exports"
-fi
-
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/resmon/routines.env"
 if [[ ! -f "$CONF" ]]; then
   mkdir -p "$(dirname "$CONF")"
